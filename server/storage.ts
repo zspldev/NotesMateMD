@@ -52,9 +52,15 @@ export class MemStorage implements IStorage {
   }
 
   private async seedData() {
+    // Generate UUIDs for consistent seeding
+    const org1Id = "550e8400-e29b-41d4-a716-446655440000";
+    const org2Id = "550e8400-e29b-41d4-a716-446655440001";
+    const emp1Id = "660e8400-e29b-41d4-a716-446655440000";
+    const emp2Id = "660e8400-e29b-41d4-a716-446655440001";
+
     // Seed organizations
     const org1: Org = {
-      orgid: "org-001",
+      orgid: org1Id,
       org_name: "Metropolitan Medical Center",
       org_type: "hospital",
       address: "123 Medical Plaza, Healthcare City, HC 12345",
@@ -64,7 +70,7 @@ export class MemStorage implements IStorage {
     this.orgs.set(org1.orgid, org1);
 
     const org2: Org = {
-      orgid: "org-002", 
+      orgid: org2Id, 
       org_name: "Family Health Clinic",
       org_type: "clinic",
       address: "456 Wellness Ave, Healthtown, HT 67890",
@@ -77,8 +83,8 @@ export class MemStorage implements IStorage {
     const hashedPassword = await bcrypt.hash("password123", 10);
     
     const emp1: Employee = {
-      empid: "emp-001",
-      orgid: "org-001",
+      empid: emp1Id,
+      orgid: org1Id,
       username: "dr.smith",
       password_hash: hashedPassword,
       first_name: "Dr. John",
@@ -89,8 +95,8 @@ export class MemStorage implements IStorage {
     this.employees.set(emp1.empid, emp1);
 
     const emp2: Employee = {
-      empid: "emp-002",
-      orgid: "org-001", 
+      empid: emp2Id,
+      orgid: org1Id, 
       username: "dr.wilson",
       password_hash: hashedPassword,
       first_name: "Dr. Sarah",
@@ -103,7 +109,7 @@ export class MemStorage implements IStorage {
     // Seed patients
     const patient1: Patient = {
       patientid: "MRN001234",
-      orgid: "org-001",
+      orgid: org1Id,
       first_name: "Sarah",
       last_name: "Johnson",
       date_of_birth: "1985-03-15",
@@ -115,7 +121,7 @@ export class MemStorage implements IStorage {
 
     const patient2: Patient = {
       patientid: "MRN005678",
-      orgid: "org-001",
+      orgid: org1Id,
       first_name: "Michael", 
       last_name: "Chen",
       date_of_birth: "1979-11-22",
@@ -127,7 +133,7 @@ export class MemStorage implements IStorage {
 
     const patient3: Patient = {
       patientid: "MRN009876",
-      orgid: "org-001",
+      orgid: org1Id,
       first_name: "Emma",
       last_name: "Davis", 
       date_of_birth: "1992-07-03",
@@ -137,11 +143,17 @@ export class MemStorage implements IStorage {
     };
     this.patients.set(patient3.patientid, patient3);
 
+    // Generate UUIDs for visits and notes
+    const visit1Id = "770e8400-e29b-41d4-a716-446655440000";
+    const visit2Id = "770e8400-e29b-41d4-a716-446655440001";
+    const note1Id = "880e8400-e29b-41d4-a716-446655440000";
+    const note2Id = "880e8400-e29b-41d4-a716-446655440001";
+
     // Seed visits
     const visit1: Visit = {
-      visitid: "visit-001",
+      visitid: visit1Id,
       patientid: "MRN001234", 
-      empid: "emp-001",
+      empid: emp1Id,
       visit_date: "2024-09-10",
       visit_purpose: "Annual physical exam and blood pressure check",
       created_at: new Date()
@@ -149,9 +161,9 @@ export class MemStorage implements IStorage {
     this.visits.set(visit1.visitid, visit1);
 
     const visit2: Visit = {
-      visitid: "visit-002",
+      visitid: visit2Id,
       patientid: "MRN001234",
-      empid: "emp-001", 
+      empid: emp1Id, 
       visit_date: "2024-08-15",
       visit_purpose: "Follow-up for hypertension medication adjustment",
       created_at: new Date()
@@ -160,8 +172,8 @@ export class MemStorage implements IStorage {
 
     // Seed visit notes
     const note1: VisitNote = {
-      noteid: "note-001",
-      visitid: "visit-001",
+      noteid: note1Id,
+      visitid: visit1Id,
       audio_file: null,
       audio_filename: "note_20240910_143022.wav",
       audio_duration_seconds: 180,
@@ -173,8 +185,8 @@ export class MemStorage implements IStorage {
     this.visitNotes.set(note1.noteid, note1);
 
     const note2: VisitNote = {
-      noteid: "note-002", 
-      visitid: "visit-002",
+      noteid: note2Id, 
+      visitid: visit2Id,
       audio_file: null,
       audio_filename: "note_20240815_100530.wav",
       audio_duration_seconds: 95,
