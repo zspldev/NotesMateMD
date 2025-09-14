@@ -67,9 +67,16 @@ class DeepgramTranscriptionService {
       };
 
       console.log('Starting Deepgram transcription with options:', options);
+      console.log('Audio buffer size:', audioBuffer.length, 'bytes, MIME type:', mimeType);
+      
+      // Create source object with buffer and mimetype for Deepgram
+      const source = {
+        buffer: audioBuffer,
+        mimetype: mimeType
+      };
       
       const response = await client.listen.prerecorded.transcribeFile(
-        audioBuffer,
+        source,
         options
       );
 
