@@ -282,8 +282,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         noteData.audio_mimetype = req.body.audio_mimetype || req.file.mimetype || 'audio/wav';
         noteData.audio_duration_seconds = parseInt(req.body.audio_duration_seconds) || null;
 
-        // Automatically transcribe audio using Deepgram if no manual transcription provided
-        if (!noteData.transcription_text) {
+        // Automatically transcribe audio using Deepgram if no manual transcription provided AND audio has content
+        if (!noteData.transcription_text && req.file.buffer && req.file.buffer.length > 0) {
           console.log('Starting Deepgram transcription for audio file:', noteData.audio_filename);
           
           try {

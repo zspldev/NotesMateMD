@@ -80,10 +80,25 @@ class DeepgramTranscriptionService {
         options
       );
 
+      // Check for Deepgram API errors first
+      if (response.error) {
+        console.error('Deepgram API error:', response.error);
+        return {
+          error: "Deepgram API error",
+          details: "Invalid audio format or API issue"
+        };
+      }
+
       if (!response.result?.results?.channels?.[0]?.alternatives?.[0]) {
+        console.log('Deepgram response structure check failed:');
+        console.log('- response.result:', !!response.result);
+        console.log('- response.result.results:', !!response.result?.results);
+        console.log('- channels length:', response.result?.results?.channels?.length || 0);
+        console.log('- alternatives:', response.result?.results?.channels?.[0]?.alternatives?.length || 0);
+        
         return {
           error: "No transcription results received",
-          details: "Deepgram returned empty results"
+          details: "Audio file may be empty or in unsupported format"
         };
       }
 
