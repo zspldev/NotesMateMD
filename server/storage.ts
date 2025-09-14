@@ -83,7 +83,7 @@ export class MemStorage implements IStorage {
     this.orgs.set(org2.orgid, org2);
 
     // Seed employees with hashed passwords
-    const hashedPassword = await bcrypt.hash("password123", 10);
+    const hashedPassword = await bcrypt.hash("simple123", 10);
     
     const emp1: Employee = {
       empid: emp1Id,
