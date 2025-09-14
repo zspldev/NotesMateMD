@@ -100,7 +100,7 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
             </Button>
           </form>
           <div className="mt-6 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground">
-            <strong>Demo Credentials:</strong> Username: dr.smith or dr.wilson, Password: password123
+            <strong>Demo Credentials:</strong> Username: dr.smith or dr.wilson, Password: simple123
           </div>
         </CardContent>
       </Card>
