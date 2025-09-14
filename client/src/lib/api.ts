@@ -54,11 +54,16 @@ export interface VisitNote {
   visitid: string;
   audio_file: string | null;
   audio_filename: string | null;
+  audio_mimetype?: string | null;
   audio_duration_seconds: number | null;
   transcription_text: string | null;
   is_transcription_edited: boolean | null;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface VisitNoteResponse extends VisitNote {
+  ai_transcribed?: boolean;
 }
 
 class ApiClient {
@@ -162,10 +167,21 @@ class ApiClient {
     audioBlob: Blob,
     transcription?: string,
     audioDuration?: number
-  ): Promise<VisitNote> {
+  ): Promise<VisitNoteResponse> {
     const formData = new FormData();
     formData.append('visitid', visitid);
-    formData.append('audio', audioBlob, 'recording.wav');
+    
+    // Use proper file extension based on MIME type
+    const getFileExtension = (mimeType: string): string => {
+      if (mimeType.includes('webm')) return 'webm';
+      if (mimeType.includes('mp4')) return 'm4a';
+      if (mimeType.includes('ogg')) return 'ogg';
+      return 'wav'; // fallback
+    };
+    
+    const extension = getFileExtension(audioBlob.type);
+    formData.append('audio', audioBlob, `recording.${extension}`);
+    formData.append('audio_mimetype', audioBlob.type);
     
     if (transcription) {
       formData.append('transcription_text', transcription);

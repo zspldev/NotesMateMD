@@ -8,6 +8,7 @@ import {
   insertVisitNoteSchema 
 } from "@shared/schema";
 import multer from "multer";
+import { transcriptionService, type TranscriptionResult, type TranscriptionError } from "./transcription";
 
 // Configure multer for audio file uploads
 const upload = multer({
@@ -278,12 +279,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.file) {
         noteData.audio_file = req.file.buffer.toString('base64');
         noteData.audio_filename = req.file.originalname;
+        noteData.audio_mimetype = req.body.audio_mimetype || req.file.mimetype || 'audio/wav';
         noteData.audio_duration_seconds = parseInt(req.body.audio_duration_seconds) || null;
+
+        // Automatically transcribe audio using Deepgram if no manual transcription provided
+        if (!noteData.transcription_text) {
+          console.log('Starting Deepgram transcription for audio file:', noteData.audio_filename);
+          
+          try {
+            const transcriptionResult = await transcriptionService.transcribeAudio(
+              req.file.buffer,
+              req.file.mimetype
+            );
+
+            if ('error' in transcriptionResult) {
+              console.error('Deepgram transcription failed:', transcriptionResult.error);
+              // Continue without transcription rather than failing the entire request
+              noteData.transcription_text = `[Transcription failed: ${transcriptionResult.error}]`;
+            } else {
+              noteData.transcription_text = transcriptionResult.text;
+              noteData.is_transcription_edited = false; // Mark as auto-generated
+              noteData.ai_transcribed = true; // Mark that AI transcription was used
+              console.log(`Deepgram transcription completed: ${transcriptionResult.text.length} characters, confidence: ${transcriptionResult.confidence}`);
+            }
+          } catch (transcriptionError) {
+            console.error('Deepgram service error:', transcriptionError);
+            noteData.transcription_text = '[Automatic transcription unavailable]';
+          }
+        }
       }
 
       const validatedData = insertVisitNoteSchema.parse(noteData);
       const note = await storage.createVisitNote(validatedData);
-      res.status(201).json(note);
+      
+      // Add ai_transcribed flag to response if it was set
+      const response = {
+        ...note,
+        ai_transcribed: noteData.ai_transcribed || false
+      };
+      
+      res.status(201).json(response);
     } catch (error) {
       console.error('Create note error:', error);
       res.status(400).json({ error: error instanceof Error ? error.message : "Invalid note data" });
@@ -319,8 +354,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const audioBuffer = Buffer.from(note.audio_file, 'base64');
       const filename = note.audio_filename || `audio_${noteid}.wav`;
+      const mimeType = note.audio_mimetype || 'audio/wav';
       
-      res.setHeader('Content-Type', 'audio/wav');
+      res.setHeader('Content-Type', mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.send(audioBuffer);
     } catch (error) {

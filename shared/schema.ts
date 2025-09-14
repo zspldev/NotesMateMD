@@ -53,6 +53,7 @@ export const visit_notes = pgTable("visit_notes", {
   visitid: uuid("visitid").references(() => visits.visitid).notNull(),
   audio_file: text("audio_file"), // Base64 encoded audio data
   audio_filename: varchar("audio_filename", { length: 255 }),
+  audio_mimetype: varchar("audio_mimetype", { length: 100 }), // Store original MIME type
   audio_duration_seconds: integer("audio_duration_seconds"),
   transcription_text: text("transcription_text"),
   is_transcription_edited: boolean("is_transcription_edited").default(false),

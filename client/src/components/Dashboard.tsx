@@ -169,13 +169,13 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   }, [selectedPatient, loginData.employee.empid, currentUser]);
 
   const handleSaveNote = useCallback(async (audioBlob: Blob, transcription: string) => {
-    if (!currentVisit) return;
+    if (!currentVisit) return { ai_transcribed: false };
 
     try {
       // Calculate approximate duration (this would normally come from audio recording)
       const audioDuration = Math.floor(audioBlob.size / 16000); // Rough estimate
       
-      await api.createNoteWithAudio(
+      const result = await api.createNoteWithAudio(
         currentVisit.visitId,
         audioBlob,
         transcription,
@@ -191,9 +191,12 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
         const uiVisits = visitsData.map(mapVisitToUI);
         setVisits(uiVisits);
       }
+      
+      return { ai_transcribed: result.ai_transcribed || false };
     } catch (error) {
       console.error('Failed to save note:', error);
       setError('Failed to save note. Please try again.');
+      return { ai_transcribed: false };
     }
   }, [currentVisit, selectedPatient, mapVisitToUI]);
 
