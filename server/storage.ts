@@ -3,10 +3,13 @@ import {
   type Employee, type InsertEmployee,
   type Patient, type InsertPatient,
   type Visit, type InsertVisit,
-  type VisitNote, type InsertVisitNote 
+  type VisitNote, type InsertVisitNote,
+  orgs, employees, patients, visits, visit_notes
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
+import { eq, desc, and, ilike, or } from "drizzle-orm";
+import { db } from "./db";
 
 export interface IStorage {
   // Organization operations
@@ -176,6 +179,7 @@ export class MemStorage implements IStorage {
       visitid: visit1Id,
       audio_file: null,
       audio_filename: "note_20240910_143022.wav",
+      audio_mimetype: null,
       audio_duration_seconds: 180,
       transcription_text: "Patient presents for routine annual physical. Blood pressure 120/80, within normal limits. Patient reports feeling well with no acute concerns. Discussed importance of maintaining healthy diet and exercise routine. No changes to current medications recommended.",
       is_transcription_edited: false,
@@ -189,6 +193,7 @@ export class MemStorage implements IStorage {
       visitid: visit2Id,
       audio_file: null,
       audio_filename: "note_20240815_100530.wav",
+      audio_mimetype: null,
       audio_duration_seconds: 95,
       transcription_text: "Follow-up visit for blood pressure management. Current medication lisinopril 10mg daily showing good response. Patient reports no side effects. Blood pressure today 125/82, improved from last visit. Continue current regimen.",
       is_transcription_edited: true,
@@ -336,6 +341,7 @@ export class MemStorage implements IStorage {
       noteid, 
       audio_file: insertNote.audio_file || null,
       audio_filename: insertNote.audio_filename || null,
+      audio_mimetype: insertNote.audio_mimetype || null,
       audio_duration_seconds: insertNote.audio_duration_seconds || null,
       transcription_text: insertNote.transcription_text || null,
       is_transcription_edited: insertNote.is_transcription_edited ?? false,
@@ -360,4 +366,139 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  // Organization methods
+  async getOrgs(): Promise<Org[]> {
+    return await db.select().from(orgs);
+  }
+
+  async getOrg(orgid: string): Promise<Org | undefined> {
+    const result = await db.select().from(orgs).where(eq(orgs.orgid, orgid));
+    return result[0];
+  }
+
+  async createOrg(insertOrg: InsertOrg): Promise<Org> {
+    const result = await db.insert(orgs).values(insertOrg).returning();
+    return result[0];
+  }
+
+  // Employee methods
+  async getEmployees(orgid: string): Promise<Employee[]> {
+    return await db.select().from(employees).where(eq(employees.orgid, orgid));
+  }
+
+  async getEmployee(empid: string): Promise<Employee | undefined> {
+    const result = await db.select().from(employees).where(eq(employees.empid, empid));
+    return result[0];
+  }
+
+  async getEmployeeByUsername(username: string): Promise<Employee | undefined> {
+    const result = await db.select().from(employees).where(eq(employees.username, username));
+    return result[0];
+  }
+
+  async createEmployee(employee: InsertEmployee): Promise<Employee> {
+    const result = await db.insert(employees).values(employee).returning();
+    return result[0];
+  }
+
+  async authenticateEmployee(username: string, password: string): Promise<Employee | null> {
+    const employee = await this.getEmployeeByUsername(username);
+    if (!employee) return null;
+    
+    const isValid = await bcrypt.compare(password, employee.password_hash);
+    return isValid ? employee : null;
+  }
+
+  // Patient methods
+  async getPatients(orgid: string): Promise<Patient[]> {
+    return await db.select().from(patients).where(eq(patients.orgid, orgid));
+  }
+
+  async getPatient(patientid: string): Promise<Patient | undefined> {
+    const result = await db.select().from(patients).where(eq(patients.patientid, patientid));
+    return result[0];
+  }
+
+  async createPatient(patient: InsertPatient): Promise<Patient> {
+    const result = await db.insert(patients).values(patient).returning();
+    return result[0];
+  }
+
+  async updatePatient(patientid: string, updates: Partial<InsertPatient>): Promise<Patient | undefined> {
+    const result = await db.update(patients)
+      .set(updates)
+      .where(eq(patients.patientid, patientid))
+      .returning();
+    return result[0];
+  }
+
+  async searchPatients(orgid: string, query: string): Promise<Patient[]> {
+    if (!query) {
+      return await this.getPatients(orgid);
+    }
+    
+    return await db.select()
+      .from(patients)
+      .where(
+        and(
+          eq(patients.orgid, orgid),
+          or(
+            ilike(patients.first_name, `%${query}%`),
+            ilike(patients.last_name, `%${query}%`),
+            ilike(patients.patientid, `%${query}%`)
+          )
+        )
+      );
+  }
+
+  // Visit methods
+  async getVisits(patientid: string): Promise<Visit[]> {
+    return await db.select()
+      .from(visits)
+      .where(eq(visits.patientid, patientid))
+      .orderBy(desc(visits.visit_date));
+  }
+
+  async getVisit(visitid: string): Promise<Visit | undefined> {
+    const result = await db.select().from(visits).where(eq(visits.visitid, visitid));
+    return result[0];
+  }
+
+  async createVisit(visit: InsertVisit): Promise<Visit> {
+    const result = await db.insert(visits).values(visit).returning();
+    return result[0];
+  }
+
+  // Visit Note methods
+  async getVisitNotes(visitid: string): Promise<VisitNote[]> {
+    return await db.select()
+      .from(visit_notes)
+      .where(eq(visit_notes.visitid, visitid))
+      .orderBy(desc(visit_notes.created_at));
+  }
+
+  async getVisitNote(noteid: string): Promise<VisitNote | undefined> {
+    const result = await db.select().from(visit_notes).where(eq(visit_notes.noteid, noteid));
+    return result[0];
+  }
+
+  async createVisitNote(note: InsertVisitNote): Promise<VisitNote> {
+    const result = await db.insert(visit_notes).values(note).returning();
+    return result[0];
+  }
+
+  async updateVisitNote(noteid: string, updates: Partial<InsertVisitNote>): Promise<VisitNote | undefined> {
+    const result = await db.update(visit_notes)
+      .set({
+        ...updates,
+        updated_at: new Date()
+      })
+      .where(eq(visit_notes.noteid, noteid))
+      .returning();
+    return result[0];
+  }
+}
+
+// Switch to database storage instead of memory storage
+export const storage = new DatabaseStorage();
