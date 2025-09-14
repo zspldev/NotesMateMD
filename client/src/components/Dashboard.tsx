@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,147 +11,234 @@ import {
   FileText, 
   Stethoscope, 
   LogOut,
-  ArrowLeft 
+  ArrowLeft,
+  Loader2
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import PatientSelector from "./PatientSelector";
 import VisitHistory from "./VisitHistory";
 import AudioRecorder from "./AudioRecorder";
+import { api, type LoginResponse, type Patient, type Visit } from "../lib/api";
 
 interface DashboardProps {
-  currentUser: {
-    firstName: string;
-    lastName: string;
-    title: string;
-    orgName: string;
-  };
+  loginData: LoginResponse;
   onLogout: () => void;
 }
 
-export default function Dashboard({ currentUser, onLogout }: DashboardProps) {
+// UI types that match existing component prop expectations
+interface UIPatient {
+  patientId: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  gender: string;
+  contactInfo?: string;
+  lastVisit?: string;
+}
+
+interface UIVisit {
+  visitId: string;
+  visitDate: string;
+  visitPurpose?: string;
+  employeeName: string;
+  employeeTitle: string;
+  notes: UINote[];
+}
+
+interface UINote {
+  noteId: string;
+  audioFilename?: string;
+  audioDurationSeconds?: number;
+  transcriptionText?: string;
+  isTranscriptionEdited: boolean;
+  createdAt: string;
+}
+
+export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   const { theme, toggleTheme } = useTheme();
-  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [currentView, setCurrentView] = useState<'select' | 'history' | 'newVisit'>('select');
   const [currentVisit, setCurrentVisit] = useState<any>(null);
+  const [patients, setPatients] = useState<UIPatient[]>([]);
+  const [visits, setVisits] = useState<UIVisit[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>("");
 
-  // Mock data - todo: remove mock functionality  
-  const mockPatients = [
-    {
-      patientId: "MRN001234",
-      firstName: "Sarah",
-      lastName: "Johnson",
-      dateOfBirth: "1985-03-15",
-      gender: "Female",
-      contactInfo: "Phone: (555) 123-4567, Email: sarah.j@email.com",
-      lastVisit: "2024-09-10"
-    },
-    {
-      patientId: "MRN005678",
-      firstName: "Michael",
-      lastName: "Chen",
-      dateOfBirth: "1979-11-22",
-      gender: "Male",
-      contactInfo: "Phone: (555) 987-6543",
-      lastVisit: "2024-09-08"
-    },
-    {
-      patientId: "MRN009876",
-      firstName: "Emma",
-      lastName: "Davis",
-      dateOfBirth: "1992-07-03",
-      gender: "Female",
-      contactInfo: "Phone: (555) 456-7890, Email: e.davis@email.com",
-      lastVisit: "2024-09-05"
-    }
-  ];
+  const currentUser = {
+    firstName: loginData.employee.first_name,
+    lastName: loginData.employee.last_name,
+    title: loginData.employee.title || 'Unknown',
+    orgName: loginData.organization?.org_name || 'Unknown Organization'
+  };
 
-  const mockVisits = [
-    {
-      visitId: "VID123",
-      visitDate: "2024-09-10",
-      visitPurpose: "Annual physical exam and blood pressure check",
-      employeeName: "Dr. Smith",
-      employeeTitle: "Primary Care Physician",
-      notes: [
-        {
-          noteId: "NOTE001",
-          audioFilename: "note_20240910_143022.wav",
-          audioDurationSeconds: 180,
-          transcriptionText: "Patient presents for routine annual physical. Blood pressure 120/80, within normal limits. Patient reports feeling well with no acute concerns. Discussed importance of maintaining healthy diet and exercise routine.",
-          isTranscriptionEdited: false,
-          createdAt: "2024-09-10T14:30:22Z"
-        }
-      ]
-    },
-    {
-      visitId: "VID124",
-      visitDate: "2024-08-15",
-      visitPurpose: "Follow-up for hypertension medication adjustment",
-      employeeName: "Dr. Smith",
-      employeeTitle: "Primary Care Physician",
-      notes: [
-        {
-          noteId: "NOTE002",
-          audioFilename: "note_20240815_100530.wav",
-          audioDurationSeconds: 95,
-          transcriptionText: "Follow-up visit for blood pressure management. Current medication lisinopril 10mg daily showing good response. Patient reports no side effects. Blood pressure today 125/82, improved from last visit.",
-          isTranscriptionEdited: true,
-          createdAt: "2024-08-15T10:05:30Z"
-        }
-      ]
-    }
-  ];
+  // Map API Patient to UI Patient
+  const mapPatientToUI = useCallback((patient: Patient): UIPatient => ({
+    patientId: patient.patientid,
+    firstName: patient.first_name,
+    lastName: patient.last_name,
+    dateOfBirth: patient.date_of_birth,
+    gender: patient.gender || '',
+    contactInfo: patient.contact_info || '',
+    lastVisit: patient.lastVisit || undefined
+  }), []);
 
-  const handleSelectPatient = (patientId: string) => {
-    const patient = mockPatients.find(p => p.patientId === patientId);
+  // Map API Visit to UI Visit
+  const mapVisitToUI = useCallback((visit: Visit): UIVisit => ({
+    visitId: visit.visitid,
+    visitDate: visit.visit_date,
+    visitPurpose: visit.visit_purpose || '',
+    employeeName: visit.employeeName || 'Unknown',
+    employeeTitle: visit.employeeTitle || 'Unknown',
+    notes: (visit.notes || []).map(note => ({
+      noteId: note.noteid,
+      audioFilename: note.audio_filename || undefined,
+      audioDurationSeconds: note.audio_duration_seconds || undefined,
+      transcriptionText: note.transcription_text || undefined,
+      isTranscriptionEdited: note.is_transcription_edited || false,
+      createdAt: note.created_at.toString()
+    }))
+  }), []);
+
+  // Load patients on mount
+  useEffect(() => {
+    const loadPatients = async () => {
+      setIsLoading(true);
+      setError("");
+      try {
+        const patientsData = await api.getPatients(loginData.employee.orgid);
+        const uiPatients = patientsData.map(mapPatientToUI);
+        setPatients(uiPatients);
+      } catch (error) {
+        console.error('Failed to load patients:', error);
+        setError('Failed to load patients. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadPatients();
+  }, [loginData.employee.orgid, mapPatientToUI]);
+
+  const handleSelectPatient = useCallback(async (patientId: string) => {
+    const patient = await api.getPatient(patientId);
     setSelectedPatient(patient);
     setCurrentView('history');
-    console.log('Patient selected:', patientId);
-  };
+    
+    // Load visits for this patient
+    setIsLoading(true);
+    setError("");
+    try {
+      const visitsData = await api.getPatientVisits(patientId);
+      const uiVisits = visitsData.map(mapVisitToUI);
+      setVisits(uiVisits);
+    } catch (error) {
+      console.error('Failed to load visits:', error);
+      setError('Failed to load visit history.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [mapVisitToUI]);
 
-  const handleCreateNewPatient = () => {
-    console.log('Create new patient triggered');
-    // todo: remove mock functionality - implement real patient creation
-  };
+  const handleCreateNewPatient = useCallback(() => {
+    console.log('Create new patient feature coming soon');
+  }, []);
 
-  const handleStartNewVisit = () => {
-    const newVisit = {
-      visitId: `VID${Date.now()}`,
-      visitDate: new Date().toISOString().split('T')[0],
-      patientId: selectedPatient?.patientId,
-      employeeName: `${currentUser.firstName} ${currentUser.lastName}`,
-      employeeTitle: currentUser.title
-    };
-    setCurrentVisit(newVisit);
-    setCurrentView('newVisit');
-    console.log('New visit started:', newVisit);
-  };
+  const handleStartNewVisit = useCallback(async () => {
+    if (!selectedPatient) return;
 
-  const handleSaveNote = (audioBlob: Blob, transcription: string) => {
-    console.log('Saving note:', { 
-      visitId: currentVisit?.visitId, 
-      audioSize: audioBlob.size,
-      transcriptionLength: transcription.length 
+    try {
+      const newVisit = await api.createVisit({
+        patientid: selectedPatient.patientid,
+        empid: loginData.employee.empid,
+        visit_date: new Date().toISOString().split('T')[0],
+        visit_purpose: null
+      });
+      
+      setCurrentVisit({
+        visitId: newVisit.visitid,
+        visitDate: newVisit.visit_date,
+        patientId: selectedPatient.patientid,
+        employeeName: `${currentUser.firstName} ${currentUser.lastName}`,
+        employeeTitle: currentUser.title
+      });
+      setCurrentView('newVisit');
+    } catch (error) {
+      console.error('Failed to create visit:', error);
+      setError('Failed to create new visit.');
+    }
+  }, [selectedPatient, loginData.employee.empid, currentUser]);
+
+  const handleSaveNote = useCallback(async (audioBlob: Blob, transcription: string) => {
+    if (!currentVisit) return;
+
+    try {
+      // Calculate approximate duration (this would normally come from audio recording)
+      const audioDuration = Math.floor(audioBlob.size / 16000); // Rough estimate
+      
+      await api.createNoteWithAudio(
+        currentVisit.visitId,
+        audioBlob,
+        transcription,
+        audioDuration
+      );
+      
+      console.log('Note saved successfully');
+      
+      // Refresh visits and go back to history
+      setCurrentView('history');
+      if (selectedPatient) {
+        const visitsData = await api.getPatientVisits(selectedPatient.patientid);
+        const uiVisits = visitsData.map(mapVisitToUI);
+        setVisits(uiVisits);
+      }
+    } catch (error) {
+      console.error('Failed to save note:', error);
+      setError('Failed to save note. Please try again.');
+    }
+  }, [currentVisit, selectedPatient, mapVisitToUI]);
+
+  const handlePlayAudio = useCallback((noteId: string) => {
+    // Create audio element and play from API endpoint
+    const audio = new Audio(api.getAudioUrl(noteId));
+    audio.play().catch(error => {
+      console.error('Failed to play audio:', error);
     });
-    // todo: remove mock functionality - implement real note saving
-  };
+  }, []);
 
-  const handlePlayAudio = (noteId: string) => {
-    console.log('Playing audio for note:', noteId);
-    // todo: remove mock functionality - implement real audio playback
-  };
-
-  const handleViewNote = (noteId: string) => {
-    console.log('Viewing note:', noteId);
-    // todo: remove mock functionality - implement full note view
-  };
+  const handleViewNote = useCallback((noteId: string) => {
+    console.log('View note details feature coming soon');
+  }, []);
 
   const renderCurrentView = () => {
+    if (error) {
+      return (
+        <Card>
+          <CardContent className="text-center py-8">
+            <div className="text-destructive mb-4">{error}</div>
+            <Button onClick={() => setError("")} variant="outline">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (isLoading) {
+      return (
+        <Card>
+          <CardContent className="text-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading...</p>
+          </CardContent>
+        </Card>
+      );
+    }
+
     switch (currentView) {
       case 'select':
         return (
           <PatientSelector
-            patients={mockPatients}
+            patients={patients}
             onSelectPatient={handleSelectPatient}
             onCreateNewPatient={handleCreateNewPatient}
           />
@@ -165,11 +252,11 @@ export default function Dashboard({ currentUser, onLogout }: DashboardProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle data-testid="text-selected-patient-name">
-                      {selectedPatient?.firstName} {selectedPatient?.lastName}
+                      {selectedPatient?.first_name} {selectedPatient?.last_name}
                     </CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      MRN: {selectedPatient?.patientId} • Age: {
-                        new Date().getFullYear() - new Date(selectedPatient?.dateOfBirth).getFullYear()
+                      MRN: {selectedPatient?.patientid} • Age: {
+                        selectedPatient ? new Date().getFullYear() - new Date(selectedPatient.date_of_birth).getFullYear() : 'Unknown'
                       }
                     </p>
                   </div>
@@ -195,10 +282,10 @@ export default function Dashboard({ currentUser, onLogout }: DashboardProps) {
             </Card>
             
             <VisitHistory
-              visits={mockVisits}
+              visits={visits}
               onPlayAudio={handlePlayAudio}
               onViewNote={handleViewNote}
-              patientName={`${selectedPatient?.firstName} ${selectedPatient?.lastName}`}
+              patientName={selectedPatient ? `${selectedPatient.first_name} ${selectedPatient.last_name}` : 'Unknown Patient'}
             />
           </div>
         );
@@ -212,7 +299,7 @@ export default function Dashboard({ currentUser, onLogout }: DashboardProps) {
                   <div>
                     <CardTitle>New Visit</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      Patient: {selectedPatient?.firstName} {selectedPatient?.lastName} (MRN: {selectedPatient?.patientId})
+                      Patient: {selectedPatient?.first_name} {selectedPatient?.last_name} (MRN: {selectedPatient?.patientid})
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Date: {new Date().toLocaleDateString()}

@@ -12,22 +12,29 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import Dashboard from "@/components/Dashboard";
 import NotFound from "@/pages/not-found";
 
-// Mock login component for prototype - todo: remove mock functionality
-function LoginPage({ onLogin }: { onLogin: (user: any) => void }) {
+import { api, type LoginResponse } from "./lib/api";
+
+function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock authentication - todo: remove mock functionality
-    const mockUser = {
-      firstName: "Dr. Sarah",
-      lastName: "Wilson",
-      title: "Primary Care Physician",
-      orgName: "Metro Health Medical Center"
-    };
-    onLogin(mockUser);
-    console.log('Mock login successful');
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const loginData = await api.login({ username, password });
+      onLogin(loginData);
+      console.log('Login successful');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error instanceof Error ? error.message : 'Login failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -78,17 +85,22 @@ function LoginPage({ onLogin }: { onLogin: (user: any) => void }) {
                 />
               </div>
             </div>
+            {error && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
+                {error}
+              </div>
+            )}
             <Button 
               type="submit" 
               className="w-full"
+              disabled={isLoading}
               data-testid="button-login"
             >
-              Sign In
+              {isLoading ? "Signing In..." : "Sign In"}
             </Button>
           </form>
           <div className="mt-6 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground">
-            <strong>Demo Note:</strong> This is a prototype with mock authentication. 
-            Enter any username/password to access the system.
+            <strong>Demo Credentials:</strong> Username: dr.smith or dr.wilson, Password: password123
           </div>
         </CardContent>
       </Card>
@@ -106,14 +118,14 @@ function Router() {
 }
 
 function App() {
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [loginData, setLoginData] = useState<LoginResponse | null>(null);
 
-  const handleLogin = (user: any) => {
-    setCurrentUser(user);
+  const handleLogin = (data: LoginResponse) => {
+    setLoginData(data);
   };
 
   const handleLogout = () => {
-    setCurrentUser(null);
+    setLoginData(null);
     console.log('User logged out');
   };
 
@@ -122,8 +134,8 @@ function App() {
       <TooltipProvider>
         <ThemeProvider defaultTheme="light">
           <Toaster />
-          {currentUser ? (
-            <Dashboard currentUser={currentUser} onLogout={handleLogout} />
+          {loginData ? (
+            <Dashboard loginData={loginData} onLogout={handleLogout} />
           ) : (
             <LoginPage onLogin={handleLogin} />
           )}
