@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, uuid, date, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, uuid, date, timestamp, boolean, integer, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -23,7 +23,10 @@ export const employees = pgTable("employees", {
   last_name: varchar("last_name", { length: 100 }).notNull(),
   title: varchar("title", { length: 100 }), // Doctor, Nurse, PA, etc.
   created_at: timestamp("created_at").default(sql`now()`),
-});
+}, (table) => ({
+  usernameIdx: index("employees_username_idx").on(table.username),
+  orgidIdx: index("employees_orgid_idx").on(table.orgid),
+}));
 
 // Patients table
 export const patients = pgTable("patients", {
@@ -35,7 +38,9 @@ export const patients = pgTable("patients", {
   gender: varchar("gender", { length: 20 }),
   contact_info: text("contact_info"), // Optional contact information
   created_at: timestamp("created_at").default(sql`now()`),
-});
+}, (table) => ({
+  orgidIdx: index("patients_orgid_idx").on(table.orgid),
+}));
 
 // Visits table
 export const visits = pgTable("visits", {
@@ -45,7 +50,10 @@ export const visits = pgTable("visits", {
   visit_date: date("visit_date").notNull(),
   visit_purpose: text("visit_purpose"), // Free text field
   created_at: timestamp("created_at").default(sql`now()`),
-});
+}, (table) => ({
+  patientidIdx: index("visits_patientid_idx").on(table.patientid),
+  empidIdx: index("visits_empid_idx").on(table.empid),
+}));
 
 // Visit Notes table
 export const visit_notes = pgTable("visit_notes", {
@@ -59,7 +67,9 @@ export const visit_notes = pgTable("visit_notes", {
   is_transcription_edited: boolean("is_transcription_edited").default(false),
   created_at: timestamp("created_at").default(sql`now()`),
   updated_at: timestamp("updated_at").default(sql`now()`),
-});
+}, (table) => ({
+  visitidIdx: index("visit_notes_visitid_idx").on(table.visitid),
+}));
 
 // Insert schemas
 export const insertOrgSchema = createInsertSchema(orgs).omit({
