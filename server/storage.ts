@@ -500,5 +500,5 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Switch to fast in-memory storage for better performance
-export const storage = new MemStorage();
+// Switch to optimized database storage with indexes and connection pooling
+export const storage = new DatabaseStorage();
