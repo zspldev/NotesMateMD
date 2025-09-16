@@ -500,5 +500,6 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Switch to optimized database storage with indexes and connection pooling
-export const storage = new DatabaseStorage();
+// Temporarily use in-memory storage while resolving database connection issues
+// TODO: Switch back to DatabaseStorage once DATABASE_URL is correctly updated
+export const storage = new MemStorage();
