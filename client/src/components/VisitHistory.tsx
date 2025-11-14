@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Clock, FileText, Play, User } from "lucide-react";
+import { Calendar, Clock, FileText, Play, User, Bot } from "lucide-react";
 
 interface VisitNote {
   noteId: string;
@@ -10,6 +10,7 @@ interface VisitNote {
   audioDurationSeconds?: number;
   transcriptionText?: string;
   isTranscriptionEdited: boolean;
+  aiTranscribed?: boolean;
   createdAt: string;
 }
 
@@ -125,9 +126,17 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
                               </>
                             )}
                           </div>
-                          {note.isTranscriptionEdited && (
-                            <Badge variant="secondary">Edited</Badge>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {note.aiTranscribed && (
+                              <Badge variant="secondary" className="text-xs" data-testid={`badge-ai-transcribed-${note.noteId}`}>
+                                <Bot className="h-3 w-3 mr-1" />
+                                AI Generated
+                              </Badge>
+                            )}
+                            {note.isTranscriptionEdited && (
+                              <Badge variant="secondary">Edited</Badge>
+                            )}
+                          </div>
                         </div>
 
                         {/* Audio Controls */}

@@ -236,13 +236,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/visits/:visitid/notes", async (req, res) => {
     try {
       const { visitid } = req.params;
-      
-      // Check if visit exists
-      const visit = await storage.getVisit(visitid);
-      if (!visit) {
-        return res.status(404).json({ error: "Visit not found" });
-      }
-
       const notes = await storage.getVisitNotes(visitid);
       res.json(notes);
     } catch (error) {
@@ -269,11 +262,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/notes", upload.single('audio'), async (req, res) => {
     try {
+      // Check if manual transcription was provided
+      const manualTranscription = req.body.transcription_text && req.body.transcription_text.trim().length > 0;
+      
       const noteData: any = {
         visitid: req.body.visitid,
         transcription_text: req.body.transcription_text || null,
-        is_transcription_edited: req.body.is_transcription_edited === 'true'
+        is_transcription_edited: manualTranscription // Mark as edited if manually provided
       };
+      
+      console.log('POST /api/notes received:', {
+        hasAudio: !!req.file,
+        hasManualTranscription: manualTranscription,
+        transcriptionLength: noteData.transcription_text?.length || 0
+      });
 
       // Handle audio file if provided
       if (req.file) {
@@ -298,7 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               noteData.transcription_text = `[Transcription failed: ${transcriptionResult.error}]`;
             } else {
               noteData.transcription_text = transcriptionResult.text;
-              noteData.is_transcription_edited = false; // Mark as auto-generated
+              noteData.is_transcription_edited = false; // Auto-generated, not manually edited
               noteData.ai_transcribed = true; // Mark that AI transcription was used
               console.log(`Deepgram transcription completed: ${transcriptionResult.text.length} characters, confidence: ${transcriptionResult.confidence}`);
             }
@@ -312,13 +314,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertVisitNoteSchema.parse(noteData);
       const note = await storage.createVisitNote(validatedData);
       
-      // Add ai_transcribed flag to response if it was set
-      const response = {
-        ...note,
-        ai_transcribed: noteData.ai_transcribed || false
-      };
+      console.log('Note created and returning:', {
+        noteid: note.noteid,
+        ai_transcribed: note.ai_transcribed,
+        is_transcription_edited: note.is_transcription_edited,
+        transcriptionLength: note.transcription_text?.length || 0
+      });
       
-      res.status(201).json(response);
+      res.status(201).json(note);
     } catch (error) {
       console.error('Create note error:', error);
       res.status(400).json({ error: error instanceof Error ? error.message : "Invalid note data" });

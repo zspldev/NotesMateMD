@@ -51,6 +51,7 @@ interface UINote {
   audioDurationSeconds?: number;
   transcriptionText?: string;
   isTranscriptionEdited: boolean;
+  aiTranscribed?: boolean;
   createdAt: string;
 }
 
@@ -95,8 +96,9 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
       audioDurationSeconds: note.audio_duration_seconds || undefined,
       transcriptionText: note.transcription_text || undefined,
       isTranscriptionEdited: note.is_transcription_edited || false,
-      createdAt: note.created_at.toString()
-    }))
+      aiTranscribed: note.ai_transcribed || false,
+      createdAt: new Date(note.created_at).toISOString()
+    })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }), []);
 
   // Load patients on mount
@@ -168,19 +170,29 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     }
   }, [selectedPatient, loginData.employee.empid, currentUser]);
 
-  const handleSaveNote = useCallback(async (audioBlob: Blob, transcription: string) => {
+  const handleSaveNote = useCallback(async (audioBlob: Blob | null, transcription: string) => {
     if (!currentVisit) return { ai_transcribed: false };
 
     try {
-      // Calculate approximate duration (this would normally come from audio recording)
-      const audioDuration = Math.floor(audioBlob.size / 16000); // Rough estimate
+      let result;
       
-      const result = await api.createNoteWithAudio(
-        currentVisit.visitId,
-        audioBlob,
-        transcription,
-        audioDuration
-      );
+      if (audioBlob) {
+        // Save with audio
+        const audioDuration = Math.floor(audioBlob.size / 16000); // Rough estimate
+        result = await api.createNoteWithAudio(
+          currentVisit.visitId,
+          audioBlob,
+          transcription,
+          audioDuration
+        );
+      } else {
+        // Save manual transcription only (no audio)
+        result = await api.createNote({
+          visitid: currentVisit.visitId,
+          transcription_text: transcription,
+          is_transcription_edited: true
+        });
+      }
       
       console.log('Note saved successfully');
       
@@ -191,7 +203,10 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
         setVisits(uiVisits);
       }
       
-      return { ai_transcribed: result.ai_transcribed || false };
+      return { 
+        ai_transcribed: result.ai_transcribed || false,
+        transcription_text: result.transcription_text || undefined
+      };
     } catch (error) {
       console.error('Failed to save note:', error);
       setError('Failed to save note. Please try again.');

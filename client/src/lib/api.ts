@@ -58,6 +58,7 @@ export interface VisitNote {
   audio_duration_seconds: number | null;
   transcription_text: string | null;
   is_transcription_edited: boolean | null;
+  ai_transcribed?: boolean;
   created_at: Date;
   updated_at: Date;
 }

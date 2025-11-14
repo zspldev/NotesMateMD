@@ -183,6 +183,7 @@ export class MemStorage implements IStorage {
       audio_duration_seconds: 180,
       transcription_text: "Patient presents for routine annual physical. Blood pressure 120/80, within normal limits. Patient reports feeling well with no acute concerns. Discussed importance of maintaining healthy diet and exercise routine. No changes to current medications recommended.",
       is_transcription_edited: false,
+      ai_transcribed: true,
       created_at: new Date("2024-09-10T14:30:22Z"),
       updated_at: new Date("2024-09-10T14:30:22Z")
     };
@@ -197,6 +198,7 @@ export class MemStorage implements IStorage {
       audio_duration_seconds: 95,
       transcription_text: "Follow-up visit for blood pressure management. Current medication lisinopril 10mg daily showing good response. Patient reports no side effects. Blood pressure today 125/82, improved from last visit. Continue current regimen.",
       is_transcription_edited: true,
+      ai_transcribed: false,
       created_at: new Date("2024-08-15T10:05:30Z"),
       updated_at: new Date("2024-08-15T10:05:30Z")
     };
@@ -345,6 +347,7 @@ export class MemStorage implements IStorage {
       audio_duration_seconds: insertNote.audio_duration_seconds || null,
       transcription_text: insertNote.transcription_text || null,
       is_transcription_edited: insertNote.is_transcription_edited ?? false,
+      ai_transcribed: insertNote.ai_transcribed ?? false,
       created_at: new Date(), 
       updated_at: new Date() 
     };

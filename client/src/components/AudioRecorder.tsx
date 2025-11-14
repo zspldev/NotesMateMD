@@ -7,7 +7,7 @@ import { Mic, Square, Play, Pause, Save, Edit3, Loader2, Bot, User } from "lucid
 
 interface AudioRecorderProps {
   visitId?: string;
-  onSaveNote: (audioBlob: Blob, transcription: string) => Promise<{ ai_transcribed?: boolean }>;
+  onSaveNote: (audioBlob: Blob | null, transcription: string) => Promise<{ ai_transcribed?: boolean; transcription_text?: string }>;
   existingTranscription?: string;
   isReadOnly?: boolean;
 }
@@ -122,17 +122,24 @@ export default function AudioRecorder({
       }
       
       try {
-        // Create a dummy audio blob if only manual transcription exists
-        const saveAudioBlob = audioBlob || new Blob([''], { type: 'audio/wav' });
-        const result = await onSaveNote(saveAudioBlob, transcription);
+        // Only send audio if it exists (don't send dummy blob for manual-only transcriptions)
+        const result = await onSaveNote(audioBlob!, transcription);
         
         console.log('Note saved with transcription');
         
-        // Reset state after successful save to allow adding more notes
+        // Keep transcription visible after save (for both AI and manual notes)
+        if (result.transcription_text) {
+          setTranscription(result.transcription_text);
+          setTranscriptionSource(result.ai_transcribed ? 'auto' : 'manual');
+        } else {
+          // Only clear if no transcription exists
+          setTranscription('');
+          setTranscriptionSource('none');
+        }
+        
+        // Reset audio controls but preserve transcription
         setAudioBlob(null);
-        setTranscription('');
         setRecordingTime(0);
-        setTranscriptionSource('none');
         setIsEditingTranscription(false);
         setIsPlaying(false);
       } catch (error) {

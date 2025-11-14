@@ -65,6 +65,7 @@ export const visit_notes = pgTable("visit_notes", {
   audio_duration_seconds: integer("audio_duration_seconds"),
   transcription_text: text("transcription_text"),
   is_transcription_edited: boolean("is_transcription_edited").default(false),
+  ai_transcribed: boolean("ai_transcribed").default(false), // Track if transcription was AI-generated
   created_at: timestamp("created_at").default(sql`now()`),
   updated_at: timestamp("updated_at").default(sql`now()`),
 }, (table) => ({
