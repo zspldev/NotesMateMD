@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Stethoscope, User, Lock } from "lucide-react";
+import { User, Lock } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Dashboard from "@/components/Dashboard";
 import ColorPreview from "@/pages/ColorPreview";
@@ -15,6 +15,7 @@ import LogoMockup from "@/pages/LogoMockup";
 import NotFound from "@/pages/not-found";
 
 import { api, type LoginResponse } from "./lib/api";
+import zapurzaaLogo from "@assets/ZSPL-Logo-Only Name_1763102256187.png";
 
 function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void }) {
   const [username, setUsername] = useState("");
@@ -43,13 +44,13 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <Stethoscope className="h-8 w-8" />
-            </div>
+          <div className="flex justify-center items-center gap-2">
+            <img src={zapurzaaLogo} alt="zapurzaa" className="h-10" />
+            <span className="text-3xl font-semibold" style={{ color: '#17a2b8' }}>
+              NotesMateMD
+            </span>
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold">Welcome to NotesMate</CardTitle>
             <p className="text-sm text-muted-foreground mt-2">
               Sign in to access your medical audio notes
             </p>
