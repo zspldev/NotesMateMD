@@ -54,7 +54,7 @@ export class MemStorage implements IStorage {
     this.seedData();
   }
 
-  private async seedData() {
+  private seedData() {
     // Generate UUIDs for consistent seeding
     const org1Id = "550e8400-e29b-41d4-a716-446655440000";
     const org2Id = "550e8400-e29b-41d4-a716-446655440001";
@@ -82,8 +82,8 @@ export class MemStorage implements IStorage {
     };
     this.orgs.set(org2.orgid, org2);
 
-    // Seed employees with hashed passwords
-    const hashedPassword = await bcrypt.hash("simple123", 10);
+    // Pre-computed bcrypt hash for password "simple123" (eliminates async race condition)
+    const hashedPassword = "$2b$10$vaDX.cWdVYoAdNbwlurpQ.7kzcIjmfei3n.Jy/aL0bvzwkDgYfKrG";
     
     const emp1: Employee = {
       empid: emp1Id,
