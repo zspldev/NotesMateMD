@@ -367,12 +367,9 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <Stethoscope className="h-6 w-6" />
-              </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground" data-testid="text-app-title">
-                  NotesMate
+                <h1 className="text-2xl font-bold" style={{ color: '#17a2b8' }} data-testid="text-app-title">
+                  NotesMateMD
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Medical Audio Notes & Transcription
