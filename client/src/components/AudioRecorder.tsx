@@ -126,14 +126,15 @@ export default function AudioRecorder({
         const saveAudioBlob = audioBlob || new Blob([''], { type: 'audio/wav' });
         const result = await onSaveNote(saveAudioBlob, transcription);
         
-        // Update transcription source based on whether AI was used
-        if (result.ai_transcribed) {
-          setTranscriptionSource('auto');
-        } else if (transcription.trim() && !audioBlob) {
-          setTranscriptionSource('manual');
-        }
-        
         console.log('Note saved with transcription');
+        
+        // Reset state after successful save to allow adding more notes
+        setAudioBlob(null);
+        setTranscription('');
+        setRecordingTime(0);
+        setTranscriptionSource('none');
+        setIsEditingTranscription(false);
+        setIsPlaying(false);
       } catch (error) {
         console.error('Failed to save note:', error);
       } finally {

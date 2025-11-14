@@ -184,8 +184,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
       
       console.log('Note saved successfully');
       
-      // Refresh visits and go back to history
-      setCurrentView('history');
+      // Refresh visits in background but stay in visit context to allow multiple notes
       if (selectedPatient) {
         const visitsData = await api.getPatientVisits(selectedPatient.patientid);
         const uiVisits = visitsData.map(mapVisitToUI);
