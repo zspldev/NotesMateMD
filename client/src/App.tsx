@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Stethoscope, User, Lock } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Dashboard from "@/components/Dashboard";
+import ColorPreview from "@/pages/ColorPreview";
 import NotFound from "@/pages/not-found";
 
 import { api, type LoginResponse } from "./lib/api";
@@ -111,6 +112,7 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
 function Router() {
   return (
     <Switch>
+      <Route path="/color-preview" component={ColorPreview} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
