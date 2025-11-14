@@ -11,6 +11,7 @@ import { Stethoscope, User, Lock } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Dashboard from "@/components/Dashboard";
 import ColorPreview from "@/pages/ColorPreview";
+import LogoMockup from "@/pages/LogoMockup";
 import NotFound from "@/pages/not-found";
 
 import { api, type LoginResponse } from "./lib/api";
@@ -113,6 +114,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/color-preview" component={ColorPreview} />
+      <Route path="/logo-mockup" component={LogoMockup} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
