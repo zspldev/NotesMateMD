@@ -1,4 +1,5 @@
-// Simple HTTP-based transcription service for Deepgram
+import { createClient } from "@deepgram/sdk";
+
 export interface TranscriptionResult {
   text: string;
   confidence: number;
@@ -11,10 +12,16 @@ export interface TranscriptionError {
 }
 
 class DeepgramTranscriptionService {
-  private apiKey: string | null = null;
+  private deepgram: ReturnType<typeof createClient> | null = null;
 
   constructor() {
-    this.apiKey = process.env.DEEPGRAM_API_KEY || null;
+    const apiKey = process.env.DEEPGRAM_API_KEY;
+    if (apiKey) {
+      this.deepgram = createClient(apiKey);
+      console.log('Deepgram client initialized successfully');
+    } else {
+      console.warn('DEEPGRAM_API_KEY not found - transcription service unavailable');
+    }
   }
 
   async transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<TranscriptionResult | TranscriptionError> {
@@ -26,31 +33,54 @@ class DeepgramTranscriptionService {
         };
       }
 
-      console.log('Processing audio transcription');
+      if (!this.deepgram) {
+        return {
+          error: "Deepgram service not configured",
+          details: "DEEPGRAM_API_KEY environment variable is missing"
+        };
+      }
+
+      console.log('Processing audio transcription with Deepgram');
       console.log('Audio buffer size:', audioBuffer.length, 'bytes, MIME type:', mimeType);
       
-      // For now, provide a working mock transcription service
-      // This ensures the complete workflow works while API key issues are resolved
-      const mockTranscriptions = [
-        "Patient reports feeling well today. Blood pressure is within normal limits at 120/80. Continue current medication regimen.",
-        "Follow-up visit for hypertension management. Patient reports no side effects from current medication. Blood pressure stable.",
-        "Annual physical examination. All vitals are normal. Patient maintains healthy lifestyle with regular exercise.",
-        "Consultation for routine check-up. Patient has no acute concerns. All systems appear normal on examination.",
-        "Visit for prescription refill. Patient tolerating current medications well. No adverse reactions reported."
-      ];
-      
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Return a random mock transcription
-      const mockText = mockTranscriptions[Math.floor(Math.random() * mockTranscriptions.length)];
-      
-      console.log('Transcription completed successfully');
+      const { result, error } = await this.deepgram.listen.prerecorded.transcribeFile(
+        audioBuffer,
+        {
+          model: "nova-2",
+          smart_format: true,
+          punctuate: true,
+          diarize: false,
+          language: "en-US"
+        }
+      );
+
+      if (error) {
+        console.error('Deepgram API error:', error);
+        return {
+          error: "Deepgram transcription failed",
+          details: error.message || "Unknown Deepgram error"
+        };
+      }
+
+      if (!result?.results?.channels?.[0]?.alternatives?.[0]) {
+        return {
+          error: "Invalid transcription response",
+          details: "No transcription data returned from Deepgram"
+        };
+      }
+
+      const transcript = result.results.channels[0].alternatives[0].transcript;
+      const confidence = result.results.channels[0].alternatives[0].confidence || 0;
+      const duration = result.metadata?.duration;
+
+      console.log('Deepgram transcription completed successfully');
+      console.log('Transcript length:', transcript.length, 'characters');
+      console.log('Confidence:', confidence);
       
       return {
-        text: mockText,
-        confidence: 0.95,
-        duration: audioBuffer.length / 16000 // Rough estimate for wav files
+        text: transcript,
+        confidence: confidence,
+        duration: duration
       };
 
     } catch (error) {
@@ -65,7 +95,7 @@ class DeepgramTranscriptionService {
 
   async isServiceAvailable(): Promise<boolean> {
     try {
-      return !!this.apiKey && this.apiKey.length > 10;
+      return !!this.deepgram;
     } catch (error) {
       console.error('Deepgram service check failed:', error);
       return false;
