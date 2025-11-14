@@ -90,15 +90,29 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     visitPurpose: visit.visit_purpose || '',
     employeeName: visit.employeeName || 'Unknown',
     employeeTitle: visit.employeeTitle || 'Unknown',
-    notes: (visit.notes || []).map(note => ({
-      noteId: note.noteid,
-      audioFilename: note.audio_filename || undefined,
-      audioDurationSeconds: note.audio_duration_seconds || undefined,
-      transcriptionText: note.transcription_text || undefined,
-      isTranscriptionEdited: note.is_transcription_edited || false,
-      aiTranscribed: note.ai_transcribed || false,
-      createdAt: new Date(note.created_at).toISOString()
-    })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    notes: (visit.notes || []).map(note => {
+      // Explicitly convert boolean fields to handle undefined/null
+      const aiTranscribed = note.ai_transcribed === true;
+      const isEdited = note.is_transcription_edited === true;
+      
+      console.log('Mapping note:', {
+        noteid: note.noteid,
+        ai_transcribed_raw: note.ai_transcribed,
+        aiTranscribed_mapped: aiTranscribed,
+        is_transcription_edited_raw: note.is_transcription_edited,
+        isEdited_mapped: isEdited
+      });
+      
+      return {
+        noteId: note.noteid,
+        audioFilename: note.audio_filename || undefined,
+        audioDurationSeconds: note.audio_duration_seconds || undefined,
+        transcriptionText: note.transcription_text || undefined,
+        isTranscriptionEdited: isEdited,
+        aiTranscribed: aiTranscribed,
+        createdAt: new Date(note.created_at).toISOString()
+      };
+    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }), []);
 
   // Load patients on mount
