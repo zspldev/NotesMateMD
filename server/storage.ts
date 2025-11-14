@@ -503,6 +503,5 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Temporarily use in-memory storage while resolving database connection issues
-// TODO: Switch back to DatabaseStorage once DATABASE_URL is correctly updated
-export const storage = new MemStorage();
+// Use PostgreSQL database for persistent storage
+export const storage = new DatabaseStorage();
