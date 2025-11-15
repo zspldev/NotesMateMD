@@ -1,7 +1,7 @@
 import { 
   type Org, type InsertOrg,
   type Employee, type InsertEmployee,
-  type Patient, type InsertPatient,
+  type Patient, type InsertPatient, type InsertPatientWithMRN,
   type Visit, type InsertVisit,
   type VisitNote, type InsertVisitNote,
   orgs, employees, patients, visits, visit_notes
@@ -27,7 +27,7 @@ export interface IStorage {
   // Patient operations
   getPatients(orgid: string): Promise<Patient[]>;
   getPatient(patientid: string): Promise<Patient | undefined>;
-  createPatient(patient: InsertPatient): Promise<Patient>;
+  createPatient(patient: InsertPatientWithMRN): Promise<Patient>;
   updatePatient(patientid: string, updates: Partial<InsertPatient>): Promise<Patient | undefined>;
   searchPatients(orgid: string, query: string): Promise<Patient[]>;
 
@@ -270,7 +270,7 @@ export class MemStorage implements IStorage {
     return this.patients.get(patientid);
   }
 
-  async createPatient(insertPatient: InsertPatient): Promise<Patient> {
+  async createPatient(insertPatient: InsertPatientWithMRN): Promise<Patient> {
     const patient: Patient = { 
       ...insertPatient, 
       gender: insertPatient.gender || null,
@@ -423,7 +423,7 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async createPatient(patient: InsertPatient): Promise<Patient> {
+  async createPatient(patient: InsertPatientWithMRN): Promise<Patient> {
     const result = await db.insert(patients).values(patient).returning();
     return result[0];
   }

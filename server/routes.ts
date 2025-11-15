@@ -5,10 +5,13 @@ import {
   insertEmployeeSchema,
   insertPatientSchema,
   insertVisitSchema,
-  insertVisitNoteSchema 
+  insertVisitNoteSchema,
+  type InsertPatientWithMRN
 } from "@shared/schema";
 import multer from "multer";
 import { transcriptionService, type TranscriptionResult, type TranscriptionError } from "./transcription";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 // Configure multer for audio file uploads
 const upload = multer({
@@ -135,7 +138,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/patients", async (req, res) => {
     try {
       const validatedData = insertPatientSchema.parse(req.body);
-      const patient = await storage.createPatient(validatedData);
+      
+      // Auto-generate MRN using database sequence
+      const result = await db.execute(sql`SELECT nextval('mrn_sequence')`);
+      const mrnNumber = result.rows[0].nextval;
+      const patientid = `MRN${mrnNumber}`;
+      
+      // Create patient with auto-generated MRN
+      const patientWithMRN: InsertPatientWithMRN = {
+        patientid,
+        ...validatedData,
+      };
+      
+      const patient = await storage.createPatient(patientWithMRN);
+      
       res.status(201).json(patient);
     } catch (error) {
       console.error('Create patient error:', error);

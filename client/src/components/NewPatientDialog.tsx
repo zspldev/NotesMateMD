@@ -60,7 +60,6 @@ export default function NewPatientDialog({
   const form = useForm<NewPatientFormValues>({
     resolver: zodResolver(newPatientFormSchema),
     defaultValues: {
-      patientid: "",
       orgid: orgId,
       first_name: "",
       last_name: "",
@@ -76,7 +75,6 @@ export default function NewPatientDialog({
       await onCreatePatient(values);
       // Reset form with orgId preserved
       form.reset({
-        patientid: "",
         orgid: orgId,
         first_name: "",
         last_name: "",
@@ -107,42 +105,8 @@ export default function NewPatientDialog({
             {/* Hidden field for orgid */}
             <input type="hidden" {...form.register("orgid")} value={orgId} />
             
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="patientid"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Medical Record Number (MRN)</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="MRN-12345"
-                        {...field}
-                        data-testid="input-mrn"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="date_of_birth"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date of Birth</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        data-testid="input-dob"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="text-sm text-muted-foreground mb-4">
+              Medical Record Number (MRN) will be automatically assigned.
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -183,29 +147,49 @@ export default function NewPatientDialog({
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="gender"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gender (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="date_of_birth"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date of Birth</FormLabel>
                     <FormControl>
-                      <SelectTrigger data-testid="select-gender">
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
+                      <Input
+                        type="date"
+                        {...field}
+                        data-testid="input-dob"
+                      />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Male">Male</SelectItem>
-                      <SelectItem value="Female">Female</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                      <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gender (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-gender">
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                        <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
