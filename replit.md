@@ -69,7 +69,9 @@ Preferred communication style: Simple, everyday language.
   - Added type-safe patient creation with InsertPatient schema
   - Automatic patient list refresh after creation
   - Success/error toast notifications for user feedback
-  - Full end-to-end testing verified
+  - **Fixed orgid submission**: Added hidden form field for orgid to ensure proper organization association
+  - Updated form reset logic to preserve orgid across multiple patient creations
+  - Full end-to-end testing verified (patient creation → selection → visit → notes)
 - Successfully migrated from in-memory (MemStorage) to PostgreSQL database persistence
 - Implemented DatabaseStorage class with full CRUD operations for all medical entities
 - Created comprehensive seed data for testing (organizations, employees, patients, visits)
@@ -80,3 +82,6 @@ Preferred communication style: Simple, everyday language.
   1. Transcription text displays on recording screen
   2. AI Generated badges show correctly for AI-transcribed notes
   3. Visit notes sorted newest-first
+
+### Known Technical Considerations
+- **Security Enhancement Opportunity**: Currently, the backend accepts orgid from client request body. Future improvement should derive orgid from authenticated session to prevent potential tampering.
