@@ -59,3 +59,24 @@ Preferred communication style: Simple, everyday language.
 - **Audit Trail**: Visit and note creation timestamps for compliance tracking
 - **Data Isolation**: Organization-based data segregation for multi-tenant security
 - **File Security**: Audio file validation and controlled upload mechanisms
+
+## Recent Changes
+
+### November 2025
+- **New Patient Functionality**: Implemented complete patient creation workflow
+  - Created NewPatientDialog component with comprehensive form validation
+  - Integrated dialog into Dashboard with proper state management
+  - Added type-safe patient creation with InsertPatient schema
+  - Automatic patient list refresh after creation
+  - Success/error toast notifications for user feedback
+  - Full end-to-end testing verified
+- Successfully migrated from in-memory (MemStorage) to PostgreSQL database persistence
+- Implemented DatabaseStorage class with full CRUD operations for all medical entities
+- Created comprehensive seed data for testing (organizations, employees, patients, visits)
+- Fixed AI badge display logic for visit notes
+- Implemented branding update: replaced stethoscope logo with zapurzaa + NotesMateMD text
+- Changed entire color scheme from blue to medical teal (#17a2b8)
+- Verified three UX improvements:
+  1. Transcription text displays on recording screen
+  2. AI Generated badges show correctly for AI-transcribed notes
+  3. Visit notes sorted newest-first
