@@ -63,6 +63,15 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### November 2025
+- **Auto-Incrementing MRN System**: Implemented automatic Medical Record Number generation
+  - Created PostgreSQL sequence `mrn_sequence` for sequential MRN generation starting at 1002
+  - Backend auto-generates MRN in format `MRN{sequence_number}` (e.g., MRN1002, MRN1003)
+  - Implemented type-safe separation between client input (InsertPatient) and storage layer (InsertPatientWithMRN)
+  - Removed MRN input field from NewPatientDialog form
+  - Added informational message: "Medical Record Number (MRN) will be automatically assigned"
+  - Prevents duplicate MRN errors through database-backed sequence generation
+  - Sequence-based approach ensures uniqueness even under concurrent patient creation
+  - Full end-to-end testing verified sequential MRN assignment (MRN1002, MRN1003)
 - **New Patient Functionality**: Implemented complete patient creation workflow
   - Created NewPatientDialog component with comprehensive form validation
   - Integrated dialog into Dashboard with proper state management
@@ -85,3 +94,4 @@ Preferred communication style: Simple, everyday language.
 
 ### Known Technical Considerations
 - **Security Enhancement Opportunity**: Currently, the backend accepts orgid from client request body. Future improvement should derive orgid from authenticated session to prevent potential tampering.
+- **MRN Sequence Management**: The `mrn_sequence` must exist in all deployment environments. Monitor logs for MRN creation errors to catch misconfigured sequences early.
