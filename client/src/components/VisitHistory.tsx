@@ -39,12 +39,7 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return new Date(dateString).toLocaleDateString('en-GB');
   };
 
   return (

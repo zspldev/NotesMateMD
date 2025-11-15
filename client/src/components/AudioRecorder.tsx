@@ -160,7 +160,7 @@ export default function AudioRecorder({
     <Card data-testid="card-audio-recorder">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center justify-between">
-          <span>Audio Note</span>
+          <span>Visit Note</span>
           {visitId && (
             <Badge variant="outline" data-testid="badge-visit-id">
               Visit: {visitId.slice(-8)}
@@ -203,6 +203,11 @@ export default function AudioRecorder({
           )}
         </div>
 
+        {/* Instructions */}
+        <p className="text-sm text-center text-muted-foreground">
+          Record audio notes by clicking on the microphone icon. Or click on the pencil icon to directly type the notes.
+        </p>
+
         {/* Audio Playback */}
         {audioBlob && (
           <div className="flex items-center justify-center gap-2">
@@ -224,7 +229,7 @@ export default function AudioRecorder({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Transcription</label>
+              <label className="text-sm font-medium">Notes/Audio Transcription</label>
               {transcriptionSource === 'auto' && (
                 <Badge variant="secondary" className="text-xs">
                   <Bot className="h-3 w-3 mr-1" />

@@ -362,7 +362,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
                       Patient: {selectedPatient?.first_name} {selectedPatient?.last_name} (MRN: {selectedPatient?.patientid})
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Date: {new Date().toLocaleDateString()}
+                      Date: {new Date().toLocaleDateString('en-GB')}
                     </p>
                   </div>
                   <Button 

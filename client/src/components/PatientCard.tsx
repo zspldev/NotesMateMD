@@ -59,7 +59,7 @@ export default function PatientCard({
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Calendar className="h-4 w-4" />
           <span>Age: {formatAge(dateOfBirth)}</span>
-          <span className="text-xs">({new Date(dateOfBirth).toLocaleDateString()})</span>
+          <span className="text-xs">({new Date(dateOfBirth).toLocaleDateString('en-GB')})</span>
         </div>
         
         {contactInfo && (
@@ -71,7 +71,7 @@ export default function PatientCard({
         
         {lastVisit && (
           <div className="text-xs text-muted-foreground">
-            Last visit: {new Date(lastVisit).toLocaleDateString()}
+            Last visit: {new Date(lastVisit).toLocaleDateString('en-GB')}
           </div>
         )}
         
