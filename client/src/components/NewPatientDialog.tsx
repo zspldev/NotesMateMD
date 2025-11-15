@@ -74,7 +74,16 @@ export default function NewPatientDialog({
     setIsSubmitting(true);
     try {
       await onCreatePatient(values);
-      form.reset();
+      // Reset form with orgId preserved
+      form.reset({
+        patientid: "",
+        orgid: orgId,
+        first_name: "",
+        last_name: "",
+        date_of_birth: "",
+        gender: undefined,
+        contact_info: undefined,
+      });
       onOpenChange(false);
     } catch (error) {
       console.error("Failed to create patient:", error);
@@ -95,6 +104,9 @@ export default function NewPatientDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            {/* Hidden field for orgid */}
+            <input type="hidden" {...form.register("orgid")} value={orgId} />
+            
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
