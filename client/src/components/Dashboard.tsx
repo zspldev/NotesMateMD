@@ -18,7 +18,10 @@ import { useTheme } from "./ThemeProvider";
 import PatientSelector from "./PatientSelector";
 import VisitHistory from "./VisitHistory";
 import AudioRecorder from "./AudioRecorder";
+import NewPatientDialog from "./NewPatientDialog";
+import { useToast } from "@/hooks/use-toast";
 import { api, type LoginResponse, type Patient, type Visit } from "../lib/api";
+import type { InsertPatient } from "@shared/schema";
 
 interface DashboardProps {
   loginData: LoginResponse;
@@ -57,6 +60,7 @@ interface UINote {
 
 export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   const { theme, toggleTheme } = useTheme();
+  const { toast } = useToast();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [currentView, setCurrentView] = useState<'select' | 'history' | 'newVisit'>('select');
   const [currentVisit, setCurrentVisit] = useState<any>(null);
@@ -64,6 +68,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   const [visits, setVisits] = useState<UIVisit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [isNewPatientDialogOpen, setIsNewPatientDialogOpen] = useState(false);
 
   const currentUser = {
     firstName: loginData.employee.first_name,
@@ -156,8 +161,32 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   }, [mapVisitToUI]);
 
   const handleCreateNewPatient = useCallback(() => {
-    console.log('Create new patient feature coming soon');
+    setIsNewPatientDialogOpen(true);
   }, []);
+
+  const handlePatientCreation = useCallback(async (patientData: InsertPatient) => {
+    try {
+      await api.createPatient(patientData);
+      
+      toast({
+        title: "Patient created",
+        description: `${patientData.first_name} ${patientData.last_name} has been added to the system.`,
+      });
+
+      // Reload patients list
+      const patientsData = await api.getPatients(loginData.employee.orgid);
+      const uiPatients = patientsData.map(mapPatientToUI);
+      setPatients(uiPatients);
+    } catch (error) {
+      console.error('Failed to create patient:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create patient",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  }, [loginData.employee.orgid, mapPatientToUI, toast]);
 
   const handleStartNewVisit = useCallback(async () => {
     if (!selectedPatient) return;
@@ -418,6 +447,14 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
       <main className="container mx-auto px-4 py-8">
         {renderCurrentView()}
       </main>
+
+      {/* New Patient Dialog */}
+      <NewPatientDialog
+        open={isNewPatientDialogOpen}
+        onOpenChange={setIsNewPatientDialogOpen}
+        onCreatePatient={handlePatientCreation}
+        orgId={loginData.employee.orgid}
+      />
     </div>
   );
 }

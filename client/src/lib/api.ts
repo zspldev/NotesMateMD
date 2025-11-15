@@ -1,4 +1,5 @@
 // API client for NotesMate backend
+import type { InsertPatient } from "@shared/schema";
 
 export interface LoginCredentials {
   username: string;
@@ -110,7 +111,7 @@ class ApiClient {
     return this.request<Patient>(`/patients/${patientid}`);
   }
 
-  async createPatient(patient: Omit<Patient, 'created_at' | 'lastVisit'>): Promise<Patient> {
+  async createPatient(patient: InsertPatient): Promise<Patient> {
     return this.request<Patient>('/patients', {
       method: 'POST',
       body: JSON.stringify(patient),

@@ -28,26 +28,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
-import { insertPatientSchema } from "@shared/schema";
+import { insertPatientSchema, type InsertPatient } from "@shared/schema";
 
+// Extend the schema with additional validation for form fields
 const newPatientFormSchema = insertPatientSchema.extend({
-  patientid: z.string()
-    .min(1, "Medical Record Number is required")
-    .max(50, "MRN must be 50 characters or less"),
-  first_name: z.string()
-    .min(1, "First name is required")
-    .max(100, "First name must be 100 characters or less"),
-  last_name: z.string()
-    .min(1, "Last name is required")
-    .max(100, "Last name must be 100 characters or less"),
   date_of_birth: z.string()
     .min(1, "Date of birth is required")
     .refine((date) => {
       const d = new Date(date);
       return !isNaN(d.getTime()) && d <= new Date();
     }, "Must be a valid date in the past"),
-  gender: z.string().optional(),
-  contact_info: z.string().optional(),
 });
 
 type NewPatientFormValues = z.infer<typeof newPatientFormSchema>;
@@ -75,8 +65,8 @@ export default function NewPatientDialog({
       first_name: "",
       last_name: "",
       date_of_birth: "",
-      gender: "",
-      contact_info: "",
+      gender: undefined,
+      contact_info: undefined,
     },
   });
 
@@ -187,7 +177,7 @@ export default function NewPatientDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Gender (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger data-testid="select-gender">
                         <SelectValue placeholder="Select gender" />
@@ -215,6 +205,7 @@ export default function NewPatientDialog({
                     <Textarea
                       placeholder="Phone: (555) 123-4567&#10;Email: patient@example.com&#10;Address: 123 Main St, City, State"
                       {...field}
+                      value={field.value || ""}
                       rows={3}
                       data-testid="input-contact-info"
                     />
