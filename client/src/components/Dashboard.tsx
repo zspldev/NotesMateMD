@@ -398,7 +398,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
             <div className="flex items-center gap-4">
               <div>
                 <h1 className="text-2xl font-bold" style={{ color: '#17a2b8' }} data-testid="text-app-title">
-                  NotesMateMD
+                  NotesMate MD
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Medical Audio Notes & Transcription

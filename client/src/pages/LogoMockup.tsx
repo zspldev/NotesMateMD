@@ -12,7 +12,7 @@ export default function LogoMockup() {
           <div className="flex items-center justify-center gap-3">
             <img src={logoImage} alt="zapurzaa" className="h-12" />
             <span className="text-4xl font-semibold" style={{ color: '#17a2b8' }}>
-              NotesMateMD
+              NotesMate MD
             </span>
           </div>
         </div>
@@ -23,7 +23,7 @@ export default function LogoMockup() {
           <div className="flex items-center justify-center gap-3">
             <img src={logoImage} alt="zapurzaa" className="h-12" />
             <span className="text-4xl font-semibold" style={{ color: '#17a2b8' }}>
-              NotesMateMD
+              NotesMate MD
             </span>
           </div>
         </div>
@@ -34,7 +34,7 @@ export default function LogoMockup() {
           <div className="flex items-center justify-center gap-4">
             <img src={logoImage} alt="zapurzaa" className="h-16" />
             <span className="text-5xl font-semibold" style={{ color: '#17a2b8' }}>
-              NotesMateMD
+              NotesMate MD
             </span>
           </div>
         </div>
@@ -45,7 +45,7 @@ export default function LogoMockup() {
           <div className="flex items-center justify-center gap-2">
             <img src={logoImage} alt="zapurzaa" className="h-8" />
             <span className="text-2xl font-semibold" style={{ color: '#17a2b8' }}>
-              NotesMateMD
+              NotesMate MD
             </span>
           </div>
         </div>

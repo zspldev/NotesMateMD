@@ -15,7 +15,6 @@ import LogoMockup from "@/pages/LogoMockup";
 import NotFound from "@/pages/not-found";
 
 import { api, type LoginResponse } from "./lib/api";
-import zapurzaaLogo from "@assets/ZSPL-Logo-Only Name_1763102256187.png";
 
 function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void }) {
   const [username, setUsername] = useState("");
@@ -44,11 +43,13 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
-          <div className="flex justify-center items-center gap-2">
-            <img src={zapurzaaLogo} alt="zapurzaa" className="h-10" />
+          <div className="flex flex-col items-center gap-2">
             <span className="text-3xl font-semibold" style={{ color: '#17a2b8' }}>
-              NotesMateMD
+              NotesMate MD
             </span>
+            <p className="text-sm font-medium text-foreground">
+              Created by Zapurzaa Systems
+            </p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground mt-2">

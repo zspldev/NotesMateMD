@@ -12,7 +12,7 @@ export default function ColorPreview() {
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <h1 className="text-3xl font-bold mb-8">NotesMateMD Color Options</h1>
+        <h1 className="text-3xl font-bold mb-8">NotesMate MD Color Options</h1>
         
         {colorOptions.map((option, index) => (
           <div key={index} className="border rounded-lg p-6 space-y-4">
@@ -27,7 +27,7 @@ export default function ColorPreview() {
                   className="text-2xl font-semibold"
                   style={{ color: option.color }}
                 >
-                  NotesMateMD
+                  NotesMate MD
                 </span>
               </div>
             </div>
@@ -41,7 +41,7 @@ export default function ColorPreview() {
                     className="text-2xl font-semibold"
                     style={{ color: option.color }}
                   >
-                    NotesMateMD
+                    NotesMate MD
                   </span>
                 </div>
               </div>
