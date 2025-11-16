@@ -64,6 +64,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [currentView, setCurrentView] = useState<'select' | 'history' | 'newVisit'>('select');
   const [currentVisit, setCurrentVisit] = useState<any>(null);
+  const [latestSavedNote, setLatestSavedNote] = useState<any>(null);
   const [patients, setPatients] = useState<UIPatient[]>([]);
   const [visits, setVisits] = useState<UIVisit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -206,6 +207,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
         employeeName: `${currentUser.firstName} ${currentUser.lastName}`,
         employeeTitle: currentUser.title
       });
+      setLatestSavedNote(null); // Clear any previous note when starting new visit
       setCurrentView('newVisit');
     } catch (error) {
       console.error('Failed to create visit:', error);
@@ -217,27 +219,41 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     if (!currentVisit) return { ai_transcribed: false };
 
     try {
-      let result;
+      let noteId: string;
       
       if (audioBlob) {
         // Save with audio
         const audioDuration = Math.floor(audioBlob.size / 16000); // Rough estimate
-        result = await api.createNoteWithAudio(
+        const result = await api.createNoteWithAudio(
           currentVisit.visitId,
           audioBlob,
           transcription,
           audioDuration
         );
+        noteId = result.noteid;
       } else {
         // Save manual transcription only (no audio)
-        result = await api.createNote({
+        const result = await api.createNote({
           visitid: currentVisit.visitId,
           transcription_text: transcription,
           is_transcription_edited: true
         });
+        noteId = result.noteid;
       }
       
-      console.log('Note saved successfully');
+      console.log('Note saved successfully, noteId:', noteId);
+      
+      // Fetch the full note details to get audio data
+      const fullNote = await api.getNote(noteId);
+      console.log('Full note retrieved:', fullNote);
+      
+      // Update saved note:
+      // - If new note has audio, replace with new note (user recorded new audio)
+      // - If new note has no audio, keep previous audio note (user edited transcription only)
+      if (fullNote.audio_file && fullNote.audio_mimetype) {
+        setLatestSavedNote(fullNote);
+      }
+      // Don't clear latestSavedNote if saving transcription-only - preserve previous audio
       
       // Refresh visits in background but stay in visit context to allow multiple notes
       if (selectedPatient) {
@@ -247,8 +263,8 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
       }
       
       return { 
-        ai_transcribed: result.ai_transcribed || false,
-        transcription_text: result.transcription_text || undefined
+        ai_transcribed: fullNote.ai_transcribed || false,
+        transcription_text: fullNote.transcription_text || undefined
       };
     } catch (error) {
       console.error('Failed to save note:', error);
@@ -380,6 +396,11 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
             <AudioRecorder
               visitId={currentVisit?.visitId}
               onSaveNote={handleSaveNote}
+              existingAudioFile={latestSavedNote?.audio_file || undefined}
+              existingAudioMimetype={latestSavedNote?.audio_mimetype || undefined}
+              existingAudioDuration={latestSavedNote?.audio_duration_seconds || undefined}
+              existingAudioFilename={latestSavedNote?.audio_filename || undefined}
+              existingTranscription={latestSavedNote?.transcription_text || undefined}
             />
           </div>
         );

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,10 @@ interface AudioRecorderProps {
   visitId?: string;
   onSaveNote: (audioBlob: Blob | null, transcription: string) => Promise<{ ai_transcribed?: boolean; transcription_text?: string }>;
   existingTranscription?: string;
+  existingAudioFile?: string; // Base64 encoded audio
+  existingAudioMimetype?: string;
+  existingAudioDuration?: number;
+  existingAudioFilename?: string;
   isReadOnly?: boolean;
 }
 
@@ -16,12 +20,18 @@ export default function AudioRecorder({
   visitId,
   onSaveNote,
   existingTranscription = "",
+  existingAudioFile,
+  existingAudioMimetype,
+  existingAudioDuration,
+  existingAudioFilename,
   isReadOnly = false,
 }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlayingSaved, setIsPlayingSaved] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [savedAudioBlob, setSavedAudioBlob] = useState<Blob | null>(null);
   const [transcription, setTranscription] = useState(existingTranscription);
   const [isEditingTranscription, setIsEditingTranscription] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -30,6 +40,8 @@ export default function AudioRecorder({
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const savedAudioRef = useRef<HTMLAudioElement | null>(null);
+  const savedAudioUrlRef = useRef<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const actualMimeTypeRef = useRef<string>('audio/wav');
 
@@ -156,6 +168,86 @@ export default function AudioRecorder({
     setTranscriptionSource(value ? 'manual' : 'none');
   };
 
+  // Convert Base64 audio to Blob when existing audio is provided
+  useEffect(() => {
+    if (existingAudioFile && existingAudioMimetype) {
+      try {
+        // Decode Base64 to binary
+        const binaryString = atob(existingAudioFile);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        // Create blob from binary data
+        const blob = new Blob([bytes], { type: existingAudioMimetype });
+        setSavedAudioBlob(blob);
+        console.log('Saved audio loaded:', existingAudioFilename, blob.size, 'bytes');
+      } catch (error) {
+        console.error('Error converting Base64 to Blob:', error);
+      }
+    } else {
+      // Clear saved audio blob when props are cleared
+      // Stop playback if currently playing
+      if (savedAudioRef.current) {
+        savedAudioRef.current.pause();
+        savedAudioRef.current = null;
+      }
+      if (savedAudioUrlRef.current) {
+        URL.revokeObjectURL(savedAudioUrlRef.current);
+        savedAudioUrlRef.current = null;
+      }
+      setSavedAudioBlob(null);
+      setIsPlayingSaved(false);
+    }
+
+    // Cleanup: stop audio when component unmounts or props change
+    return () => {
+      if (savedAudioRef.current) {
+        savedAudioRef.current.pause();
+        savedAudioRef.current = null;
+      }
+      if (savedAudioUrlRef.current) {
+        URL.revokeObjectURL(savedAudioUrlRef.current);
+        savedAudioUrlRef.current = null;
+      }
+      setIsPlayingSaved(false);
+    };
+  }, [existingAudioFile, existingAudioMimetype, existingAudioFilename]);
+
+  const playSavedAudio = () => {
+    if (savedAudioBlob && !isPlayingSaved) {
+      const audioUrl = URL.createObjectURL(savedAudioBlob);
+      savedAudioUrlRef.current = audioUrl;
+      const audio = new Audio(audioUrl);
+      savedAudioRef.current = audio;
+      
+      audio.onended = () => {
+        setIsPlayingSaved(false);
+        if (savedAudioUrlRef.current) {
+          URL.revokeObjectURL(savedAudioUrlRef.current);
+          savedAudioUrlRef.current = null;
+        }
+      };
+      
+      audio.play();
+      setIsPlayingSaved(true);
+      console.log('Saved audio playback started');
+    }
+  };
+
+  const pauseSavedAudio = () => {
+    if (savedAudioRef.current && isPlayingSaved) {
+      savedAudioRef.current.pause();
+      setIsPlayingSaved(false);
+      // Revoke URL when paused
+      if (savedAudioUrlRef.current) {
+        URL.revokeObjectURL(savedAudioUrlRef.current);
+        savedAudioUrlRef.current = null;
+      }
+      console.log('Saved audio playback paused');
+    }
+  };
+
   return (
     <Card data-testid="card-audio-recorder">
       <CardHeader className="pb-4">
@@ -208,7 +300,34 @@ export default function AudioRecorder({
           Record audio notes by clicking on the microphone icon. Or click on the pencil icon to directly type the notes.
         </p>
 
-        {/* Audio Playback */}
+        {/* Saved Audio Playback */}
+        {savedAudioBlob && (
+          <div className="p-3 rounded-md border bg-card">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={isPlayingSaved ? pauseSavedAudio : playSavedAudio}
+                  data-testid="button-play-pause-saved"
+                >
+                  {isPlayingSaved ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                </Button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {existingAudioFilename || 'Saved Audio'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isPlayingSaved ? 'Playing...' : 'Click play to listen to saved audio'}
+                    {existingAudioDuration && ` • ${formatTime(existingAudioDuration)}`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* New Recording Playback */}
         {audioBlob && (
           <div className="flex items-center justify-center gap-2">
             <Button 
