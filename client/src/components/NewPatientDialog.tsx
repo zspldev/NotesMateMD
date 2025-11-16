@@ -157,10 +157,12 @@ export default function NewPatientDialog({
                     <FormControl>
                       <Input
                         type="date"
+                        placeholder="DD/MM/YYYY"
                         {...field}
                         data-testid="input-dob"
                       />
                     </FormControl>
+                    <p className="text-xs text-muted-foreground">Format: DD/MM/YYYY</p>
                     <FormMessage />
                   </FormItem>
                 )}
