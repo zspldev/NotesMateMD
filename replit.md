@@ -92,6 +92,22 @@ Preferred communication style: Simple, everyday language.
   2. AI Generated badges show correctly for AI-transcribed notes
   3. Visit notes sorted newest-first
 
+### December 2025
+- **Medical Editor with AI Auto-Format**: Enhanced clinical note editing with intelligent features
+  - **Template Selection**: SOAP Note, History & Physical, Progress Note, Procedure Note templates
+  - **Auto-Format with AI**: Uses OpenAI (via Replit AI Integrations) to reorganize transcribed text into selected template format
+  - **Quick Insert Phrases**: Common medical phrases like "Patient denies...", "No acute distress", "Within normal limits"
+  - **Abbreviation Expansion**: Type medical abbreviations (e.g., "htn", "dm2", "sob") and press Tab to expand
+  - **Word Count**: Real-time word count display
+  - **Source Badges**: Shows whether note is AI-generated or manually entered
+  - Files: `server/openai.ts`, `client/src/components/MedicalEditor.tsx`
+  - API endpoints: `/api/medical/templates`, `/api/medical/format`, `/api/medical/abbreviations`, `/api/medical/quick-phrases`
+- **Patient Management Enhancements**:
+  - Edit patient dialog for updating patient information
+  - Delete patient with cascade deletion (removes all visits and notes)
+  - Confirmation dialog with warning about permanent data deletion
+
 ### Known Technical Considerations
 - **Security Enhancement Opportunity**: Currently, the backend accepts orgid from client request body. Future improvement should derive orgid from authenticated session to prevent potential tampering.
 - **MRN Sequence Management**: The `mrn_sequence` must exist in all deployment environments. Monitor logs for MRN creation errors to catch misconfigured sequences early.
+- **AI Integration**: Uses Replit AI Integrations for OpenAI access (no separate API key required). Charges are billed to Replit credits.

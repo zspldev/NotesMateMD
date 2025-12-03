@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Mic, Square, Play, Pause, Save, Edit3, Loader2, Bot, User } from "lucide-react";
+import { Mic, Square, Play, Pause, Save, Loader2 } from "lucide-react";
+import MedicalEditor from "./MedicalEditor";
 
 interface AudioRecorderProps {
   visitId?: string;
@@ -33,7 +33,6 @@ export default function AudioRecorder({
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [savedAudioBlob, setSavedAudioBlob] = useState<Blob | null>(null);
   const [transcription, setTranscription] = useState(existingTranscription);
-  const [isEditingTranscription, setIsEditingTranscription] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [transcriptionSource, setTranscriptionSource] = useState<'none' | 'auto' | 'manual'>('none');
@@ -152,7 +151,6 @@ export default function AudioRecorder({
         // Reset audio controls but preserve transcription
         setAudioBlob(null);
         setRecordingTime(0);
-        setIsEditingTranscription(false);
         setIsPlaying(false);
       } catch (error) {
         console.error('Failed to save note:', error);
@@ -344,36 +342,9 @@ export default function AudioRecorder({
           </div>
         )}
 
-        {/* Transcription Section */}
+        {/* Medical Editor Section */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Notes/Audio Transcription</label>
-              {transcriptionSource === 'auto' && (
-                <Badge variant="secondary" className="text-xs">
-                  <Bot className="h-3 w-3 mr-1" />
-                  AI Generated
-                </Badge>
-              )}
-              {transcriptionSource === 'manual' && (
-                <Badge variant="outline" className="text-xs">
-                  <User className="h-3 w-3 mr-1" />
-                  Manual
-                </Badge>
-              )}
-            </div>
-            {!isReadOnly && (
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setIsEditingTranscription(!isEditingTranscription)}
-                data-testid="button-edit-transcription"
-                disabled={isTranscribing}
-              >
-                <Edit3 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          <label className="text-sm font-medium">Clinical Notes</label>
           
           {isTranscribing && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -382,30 +353,15 @@ export default function AudioRecorder({
             </div>
           )}
           
-          {isEditingTranscription ? (
-            <Textarea
-              value={transcription}
-              onChange={(e) => handleTranscriptionChange(e.target.value)}
-              placeholder="Edit transcription or add manual notes..."
-              className="min-h-[120px]"
-              data-testid="textarea-transcription"
-              disabled={isTranscribing}
-            />
-          ) : (
-            <div 
-              className="min-h-[120px] p-3 rounded-md border bg-muted/50 text-sm"
-              data-testid="text-transcription-display"
-            >
-              {transcription || (
-                <span className="text-muted-foreground">
-                  {isTranscribing ? 
-                    "Transcription in progress..." : 
-                    "No transcription available. Record audio or edit manually."
-                  }
-                </span>
-              )}
-            </div>
-          )}
+          <MedicalEditor
+            value={transcription}
+            onChange={handleTranscriptionChange}
+            disabled={isReadOnly}
+            isTranscribing={isTranscribing}
+            transcriptionSource={transcriptionSource}
+            onTranscriptionSourceChange={setTranscriptionSource}
+            placeholder="Record audio for automatic transcription, or use the tools above to create structured clinical notes..."
+          />
         </div>
 
         {/* Save Button */}

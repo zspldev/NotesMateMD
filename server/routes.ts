@@ -10,6 +10,14 @@ import {
 } from "@shared/schema";
 import multer from "multer";
 import { transcriptionService, type TranscriptionResult, type TranscriptionError } from "./transcription";
+import { 
+  formatTranscriptionToTemplate, 
+  getEmptyTemplate, 
+  NOTE_TEMPLATES, 
+  MEDICAL_ABBREVIATIONS, 
+  QUICK_INSERT_PHRASES,
+  type NoteTemplate 
+} from "./openai";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 
@@ -457,6 +465,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Get employee error:', error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Medical Editor API routes
+  
+  // Get available note templates
+  app.get("/api/medical/templates", (req, res) => {
+    const templates = Object.entries(NOTE_TEMPLATES).map(([id, def]) => ({
+      id,
+      name: def.name,
+      sections: def.sections,
+      description: def.description
+    }));
+    res.json(templates);
+  });
+
+  // Get empty template structure
+  app.get("/api/medical/templates/:templateId/empty", (req, res) => {
+    const { templateId } = req.params;
+    if (!NOTE_TEMPLATES[templateId as NoteTemplate]) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+    const emptyTemplate = getEmptyTemplate(templateId as NoteTemplate);
+    res.json({ template: emptyTemplate });
+  });
+
+  // Get medical abbreviations
+  app.get("/api/medical/abbreviations", (req, res) => {
+    res.json(MEDICAL_ABBREVIATIONS);
+  });
+
+  // Get quick insert phrases
+  app.get("/api/medical/quick-phrases", (req, res) => {
+    res.json(QUICK_INSERT_PHRASES);
+  });
+
+  // AI-powered auto-format transcription to template
+  app.post("/api/medical/format", async (req, res) => {
+    try {
+      const { transcription, template } = req.body;
+      
+      if (!transcription || !template) {
+        return res.status(400).json({ error: "Transcription and template are required" });
+      }
+      
+      if (!NOTE_TEMPLATES[template as NoteTemplate]) {
+        return res.status(400).json({ error: "Invalid template type" });
+      }
+      
+      console.log(`Formatting transcription to ${template} template...`);
+      const formattedNote = await formatTranscriptionToTemplate(transcription, template as NoteTemplate);
+      console.log(`Formatting complete: ${formattedNote.length} characters`);
+      
+      res.json({ formattedNote });
+    } catch (error) {
+      console.error('Format transcription error:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to format transcription" });
     }
   });
 
