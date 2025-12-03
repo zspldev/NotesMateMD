@@ -3,8 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, UserPlus } from "lucide-react";
-import PatientCard from "./PatientCard";
+import { Search, UserPlus, Plus } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface Patient {
   patientId: string;
@@ -38,12 +45,28 @@ export default function PatientSelector({ patients, onSelectPatient, onCreateNew
 
   const genders = Array.from(new Set(patients.map(p => p.gender).filter(Boolean)));
 
+  const calculateAge = (dob: string): number => {
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const formatDate = (dateString: string | undefined): string => {
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleDateString('en-GB');
+  };
+
   return (
     <div className="space-y-6" data-testid="container-patient-selector">
       {/* Header */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+          <CardTitle className="flex items-center justify-between gap-4">
             <span>Select Patient</span>
             <Button 
               onClick={onCreateNewPatient}
@@ -115,7 +138,7 @@ export default function PatientSelector({ patients, onSelectPatient, onCreateNew
         </CardContent>
       </Card>
 
-      {/* Patient Grid */}
+      {/* Patient Table */}
       {filteredPatients.length === 0 ? (
         <Card>
           <CardContent className="text-center py-8">
@@ -152,21 +175,49 @@ export default function PatientSelector({ patients, onSelectPatient, onCreateNew
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPatients.map((patient) => (
-            <PatientCard
-              key={patient.patientId}
-              patientId={patient.patientId}
-              firstName={patient.firstName}
-              lastName={patient.lastName}
-              dateOfBirth={patient.dateOfBirth}
-              gender={patient.gender}
-              contactInfo={patient.contactInfo}
-              lastVisit={patient.lastVisit}
-              onSelect={() => onSelectPatient(patient.patientId)}
-            />
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px]">MRN</TableHead>
+                  <TableHead>Patient Name</TableHead>
+                  <TableHead className="w-[100px]">Gender</TableHead>
+                  <TableHead className="w-[80px] text-center">Age</TableHead>
+                  <TableHead className="w-[120px]">Last Visit</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPatients.map((patient) => (
+                  <TableRow 
+                    key={patient.patientId}
+                    className="cursor-pointer hover-elevate"
+                    onClick={() => onSelectPatient(patient.patientId)}
+                    data-testid={`row-patient-${patient.patientId}`}
+                  >
+                    <TableCell className="font-medium" data-testid={`text-mrn-${patient.patientId}`}>
+                      {patient.patientId}
+                    </TableCell>
+                    <TableCell data-testid={`text-patient-name-${patient.patientId}`}>
+                      {patient.firstName} {patient.lastName}
+                    </TableCell>
+                    <TableCell data-testid={`text-gender-${patient.patientId}`}>
+                      <Badge variant="outline" className="font-normal">
+                        {patient.gender}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center" data-testid={`text-age-${patient.patientId}`}>
+                      {calculateAge(patient.dateOfBirth)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground" data-testid={`text-last-visit-${patient.patientId}`}>
+                      {formatDate(patient.lastVisit)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
