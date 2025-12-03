@@ -1,0 +1,154 @@
+import { useState } from "react";
+import { Switch, Route } from "wouter";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { User, Lock } from "lucide-react";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import Dashboard from "@/components/Dashboard";
+import ColorPreview from "@/pages/ColorPreview";
+import LogoMockup from "@/pages/LogoMockup";
+import NotFound from "@/pages/not-found";
+
+import { api, type LoginResponse } from "./lib/api";
+
+function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const loginData = await api.login({ username, password });
+      onLogin(loginData);
+      console.log('Login successful');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error instanceof Error ? error.message : 'Login failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center space-y-4">
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-3xl font-semibold" style={{ color: '#17a2b8' }}>
+              NotesMate MD
+            </span>
+            <p className="text-sm font-medium text-foreground">
+              Created by Zapurzaa Systems
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground mt-2">
+              Sign in to access your medical audio notes
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Username</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your username"
+                  className="pl-10"
+                  data-testid="input-username"
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="pl-10"
+                  data-testid="input-password"
+                  required
+                />
+              </div>
+            </div>
+            {error && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
+                {error}
+              </div>
+            )}
+            <Button 
+              type="submit" 
+              className="w-full"
+              disabled={isLoading}
+              data-testid="button-login"
+            >
+              {isLoading ? "Signing In..." : "Sign In"}
+            </Button>
+          </form>
+          <div className="mt-6 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground">
+            <strong>Demo Credentials:</strong> Username: dr.smith, Password: simple123
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function Router() {
+  return (
+    <Switch>
+      <Route path="/color-preview" component={ColorPreview} />
+      <Route path="/logo-mockup" component={LogoMockup} />
+      {/* Fallback to 404 */}
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function App() {
+  const [loginData, setLoginData] = useState<LoginResponse | null>(null);
+
+  const handleLogin = (data: LoginResponse) => {
+    setLoginData(data);
+  };
+
+  const handleLogout = () => {
+    setLoginData(null);
+    console.log('User logged out');
+  };
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <ThemeProvider defaultTheme="light">
+          <Toaster />
+          {loginData ? (
+            <Dashboard loginData={loginData} onLogout={handleLogout} />
+          ) : (
+            <LoginPage onLogin={handleLogin} />
+          )}
+        </ThemeProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
