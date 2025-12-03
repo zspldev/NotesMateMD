@@ -1,8 +1,9 @@
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Clock, FileText, Play, User, Bot } from "lucide-react";
+import { Calendar, Clock, FileText, Play, Pause, User, Bot } from "lucide-react";
 
 interface VisitNote {
   noteId: string;
@@ -12,6 +13,7 @@ interface VisitNote {
   isTranscriptionEdited: boolean;
   aiTranscribed?: boolean;
   createdAt: string;
+  audioData?: string;
 }
 
 interface Visit {
@@ -31,6 +33,24 @@ interface VisitHistoryProps {
 }
 
 export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientName }: VisitHistoryProps) {
+  const [playingNoteId, setPlayingNoteId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
+    };
+  }, []);
+
   const formatDuration = (seconds?: number) => {
     if (!seconds) return "0:00";
     const mins = Math.floor(seconds / 60);
@@ -40,6 +60,72 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB');
+  };
+
+  const handlePlayPause = async (note: VisitNote) => {
+    const noteId = note.noteId;
+
+    // If currently playing this note, pause it
+    if (playingNoteId === noteId && audioRef.current) {
+      audioRef.current.pause();
+      setPlayingNoteId(null);
+      return;
+    }
+
+    // If playing a different note, stop it first
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+
+    // Check if note has audio data
+    if (!note.audioData) {
+      // Trigger the parent's onPlayAudio to fetch the audio
+      onPlayAudio(noteId);
+      return;
+    }
+
+    try {
+      // Create audio from base64 data
+      const base64Data = note.audioData;
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'audio/webm' });
+      const audioUrl = URL.createObjectURL(blob);
+      audioUrlRef.current = audioUrl;
+
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setPlayingNoteId(null);
+        if (audioUrlRef.current) {
+          URL.revokeObjectURL(audioUrlRef.current);
+          audioUrlRef.current = null;
+        }
+      };
+
+      audio.onerror = () => {
+        setPlayingNoteId(null);
+        if (audioUrlRef.current) {
+          URL.revokeObjectURL(audioUrlRef.current);
+          audioUrlRef.current = null;
+        }
+      };
+
+      await audio.play();
+      setPlayingNoteId(noteId);
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      setPlayingNoteId(null);
+    }
   };
 
   return (
@@ -140,11 +226,20 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => onPlayAudio(note.noteId)}
+                              onClick={() => handlePlayPause(note)}
                               data-testid={`button-play-audio-${note.noteId}`}
                             >
-                              <Play className="h-4 w-4 mr-2" />
-                              Play Audio
+                              {playingNoteId === note.noteId ? (
+                                <>
+                                  <Pause className="h-4 w-4 mr-2" />
+                                  Pause Audio
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="h-4 w-4 mr-2" />
+                                  Play Audio
+                                </>
+                              )}
                             </Button>
                             <span className="text-xs text-muted-foreground">
                               {note.audioFilename}

@@ -56,6 +56,7 @@ interface UINote {
   isTranscriptionEdited: boolean;
   aiTranscribed?: boolean;
   createdAt: string;
+  audioData?: string;
 }
 
 export default function Dashboard({ loginData, onLogout }: DashboardProps) {
@@ -116,7 +117,8 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
         transcriptionText: note.transcription_text || undefined,
         isTranscriptionEdited: isEdited,
         aiTranscribed: aiTranscribed,
-        createdAt: new Date(note.created_at).toISOString()
+        createdAt: new Date(note.created_at).toISOString(),
+        audioData: note.audio_file || undefined
       };
     }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }), []);
