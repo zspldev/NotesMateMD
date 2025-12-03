@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Calendar, Clock, FileText, Play, Pause, User, Bot } from "lucide-react";
 
 interface VisitNote {
@@ -32,10 +31,45 @@ interface VisitHistoryProps {
   patientName: string;
 }
 
+interface FlatNote extends VisitNote {
+  visitId: string;
+  visitDate: string;
+  visitPurpose?: string;
+  employeeName: string;
+  employeeTitle: string;
+}
+
 export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientName }: VisitHistoryProps) {
   const [playingNoteId, setPlayingNoteId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+
+  // Flatten all notes from all visits and sort by createdAt descending (newest first)
+  const allNotes = useMemo(() => {
+    const flatNotes: FlatNote[] = [];
+    
+    visits.forEach(visit => {
+      visit.notes.forEach(note => {
+        flatNotes.push({
+          ...note,
+          visitId: visit.visitId,
+          visitDate: visit.visitDate,
+          visitPurpose: visit.visitPurpose,
+          employeeName: visit.employeeName,
+          employeeTitle: visit.employeeTitle
+        });
+      });
+    });
+    
+    // Sort by createdAt descending (newest first)
+    flatNotes.sort((a, b) => {
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
+      return bTime - aTime;
+    });
+    
+    return flatNotes;
+  }, [visits]);
 
   // Cleanup audio on unmount
   useEffect(() => {
@@ -57,19 +91,6 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
-
-  const formatDate = (dateString: string) => {
-    // Parse YYYY-MM-DD directly without creating Date object (avoids UTC interpretation)
-    const parts = dateString.split('T')[0].split('-');
-    if (parts.length === 3) {
-      const year = parts[0].slice(-2);
-      const month = parts[1];
-      const day = parts[2];
-      return `${day}/${month}/${year}`;
-    }
-    // Fallback for unexpected format
-    return dateString;
-  };
   
   const formatNoteDateTime = (createdAt: string) => {
     const date = new Date(createdAt);
@@ -82,7 +103,7 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
     return `${day}/${month}/${year} at ${time}`;
   };
 
-  const handlePlayPause = async (note: VisitNote) => {
+  const handlePlayPause = async (note: FlatNote) => {
     const noteId = note.noteId;
 
     // If currently playing this note, pause it
@@ -157,146 +178,117 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {visits.length === 0 ? (
+        {allNotes.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground" data-testid="text-no-visits">
             <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No previous visits found</p>
-            <p className="text-sm">This patient has no visit history yet.</p>
+            <p>No previous notes found</p>
+            <p className="text-sm">This patient has no visit notes yet.</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {visits.map((visit) => (
-              <div key={visit.visitId} className="space-y-4" data-testid={`visit-${visit.visitId}`}>
-                {/* Visit Header */}
+          <div className="space-y-4">
+            {allNotes.map((note) => (
+              <div 
+                key={note.noteId} 
+                className="border rounded-lg p-4 space-y-3"
+                data-testid={`note-${note.noteId}`}
+              >
+                {/* Note Header with Date/Time */}
                 <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium" data-testid={`text-visit-date-${visit.visitId}`}>
-                        {formatDate(visit.visitDate)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <User className="h-4 w-4" />
-                      <span data-testid={`text-employee-${visit.visitId}`}>
-                        {visit.employeeName} ({visit.employeeTitle})
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium" data-testid={`text-note-time-${note.noteId}`}>
+                      {formatNoteDateTime(note.createdAt)}
+                    </span>
+                    {note.audioDurationSeconds && (
+                      <>
+                        <span className="text-muted-foreground">•</span>
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground" data-testid={`text-audio-duration-${note.noteId}`}>
+                          {formatDuration(note.audioDurationSeconds)}
+                        </span>
+                      </>
+                    )}
                   </div>
-                  <Badge variant="outline" data-testid={`badge-notes-count-${visit.visitId}`}>
-                    {visit.notes.length} {visit.notes.length === 1 ? 'note' : 'notes'}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {note.aiTranscribed && (
+                      <Badge variant="secondary" className="text-xs" data-testid={`badge-ai-transcribed-${note.noteId}`}>
+                        <Bot className="h-3 w-3 mr-1" />
+                        AI Generated
+                      </Badge>
+                    )}
+                    {note.isTranscriptionEdited && (
+                      <Badge variant="secondary">Edited</Badge>
+                    )}
+                  </div>
                 </div>
 
-                {/* Visit Purpose */}
-                {visit.visitPurpose && (
-                  <div className="text-sm">
-                    <span className="font-medium">Purpose: </span>
-                    <span data-testid={`text-visit-purpose-${visit.visitId}`}>
-                      {visit.visitPurpose}
+                {/* Provider Info */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <User className="h-4 w-4" />
+                  <span data-testid={`text-employee-${note.noteId}`}>
+                    {note.employeeName} ({note.employeeTitle})
+                  </span>
+                  {note.visitPurpose && (
+                    <>
+                      <span>•</span>
+                      <span data-testid={`text-visit-purpose-${note.noteId}`}>
+                        {note.visitPurpose}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Audio Controls */}
+                {note.audioFilename && (
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handlePlayPause(note)}
+                      data-testid={`button-play-audio-${note.noteId}`}
+                    >
+                      {playingNoteId === note.noteId ? (
+                        <>
+                          <Pause className="h-4 w-4 mr-2" />
+                          Pause Audio
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-2" />
+                          Play Audio
+                        </>
+                      )}
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      {note.audioFilename}
                     </span>
                   </div>
                 )}
 
-                {/* Visit Notes */}
-                <div className="space-y-3">
-                  {visit.notes.length === 0 ? (
-                    <div className="text-sm text-muted-foreground italic">
-                      No notes recorded for this visit
-                    </div>
-                  ) : (
-                    visit.notes.map((note) => (
-                      <div 
-                        key={note.noteId} 
-                        className="border rounded-lg p-4 space-y-3"
-                        data-testid={`note-${note.noteId}`}
-                      >
-                        {/* Note Header */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="h-4 w-4" />
-                            <span data-testid={`text-note-time-${note.noteId}`}>
-                              {formatNoteDateTime(note.createdAt)}
-                            </span>
-                            {note.audioDurationSeconds && (
-                              <>
-                                <span>•</span>
-                                <span data-testid={`text-audio-duration-${note.noteId}`}>
-                                  {formatDuration(note.audioDurationSeconds)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {note.aiTranscribed && (
-                              <Badge variant="secondary" className="text-xs" data-testid={`badge-ai-transcribed-${note.noteId}`}>
-                                <Bot className="h-3 w-3 mr-1" />
-                                AI Generated
-                              </Badge>
-                            )}
-                            {note.isTranscriptionEdited && (
-                              <Badge variant="secondary">Edited</Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Audio Controls */}
-                        {note.audioFilename && (
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handlePlayPause(note)}
-                              data-testid={`button-play-audio-${note.noteId}`}
-                            >
-                              {playingNoteId === note.noteId ? (
-                                <>
-                                  <Pause className="h-4 w-4 mr-2" />
-                                  Pause Audio
-                                </>
-                              ) : (
-                                <>
-                                  <Play className="h-4 w-4 mr-2" />
-                                  Play Audio
-                                </>
-                              )}
-                            </Button>
-                            <span className="text-xs text-muted-foreground">
-                              {note.audioFilename}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Transcription */}
-                        <div className="space-y-2">
-                          <div className="text-sm font-medium">Transcription:</div>
-                          <div 
-                            className="text-sm p-3 bg-muted/50 rounded border min-h-[60px]"
-                            data-testid={`text-transcription-${note.noteId}`}
-                          >
-                            {note.transcriptionText || (
-                              <span className="text-muted-foreground italic">
-                                No transcription available
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* View Full Note Button */}
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => onViewNote(note.noteId)}
-                          data-testid={`button-view-note-${note.noteId}`}
-                        >
-                          View Full Note
-                        </Button>
-                      </div>
-                    ))
-                  )}
+                {/* Transcription */}
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Transcription:</div>
+                  <div 
+                    className="text-sm p-3 bg-muted/50 rounded border min-h-[60px] whitespace-pre-wrap"
+                    data-testid={`text-transcription-${note.noteId}`}
+                  >
+                    {note.transcriptionText || (
+                      <span className="text-muted-foreground italic">
+                        No transcription available
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <Separator />
+                {/* View Full Note Button */}
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => onViewNote(note.noteId)}
+                  data-testid={`button-view-note-${note.noteId}`}
+                >
+                  View Full Note
+                </Button>
               </div>
             ))}
           </div>
