@@ -210,6 +210,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/patients/:patientid", async (req, res) => {
+    try {
+      const { patientid } = req.params;
+      
+      // Check if patient exists first
+      const patient = await storage.getPatient(patientid);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      // Delete patient and all associated records (visits, notes)
+      const deleted = await storage.deletePatient(patientid);
+      if (!deleted) {
+        return res.status(500).json({ error: "Failed to delete patient" });
+      }
+      
+      res.json({ success: true, message: "Patient and all associated records deleted successfully" });
+    } catch (error) {
+      console.error('Delete patient error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Visit routes
   app.get("/api/patients/:patientid/visits", async (req, res) => {
     try {

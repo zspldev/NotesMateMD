@@ -128,6 +128,12 @@ class ApiClient {
     });
   }
 
+  async deletePatient(patientid: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/patients/${patientid}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Visits
   async getPatientVisits(patientid: string): Promise<Visit[]> {
     return this.request<Visit[]>(`/patients/${patientid}/visits`);

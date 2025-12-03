@@ -167,6 +167,16 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     setIsNewPatientDialogOpen(true);
   }, []);
 
+  const handleRefreshPatients = useCallback(async () => {
+    try {
+      const patientsData = await api.getPatients(loginData.employee.orgid);
+      const uiPatients = patientsData.map(mapPatientToUI);
+      setPatients(uiPatients);
+    } catch (error) {
+      console.error('Failed to refresh patients:', error);
+    }
+  }, [loginData.employee.orgid, mapPatientToUI]);
+
   const handlePatientCreation = useCallback(async (patientData: InsertPatient) => {
     try {
       await api.createPatient(patientData);
@@ -177,9 +187,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
       });
 
       // Reload patients list
-      const patientsData = await api.getPatients(loginData.employee.orgid);
-      const uiPatients = patientsData.map(mapPatientToUI);
-      setPatients(uiPatients);
+      await handleRefreshPatients();
     } catch (error) {
       console.error('Failed to create patient:', error);
       toast({
@@ -189,7 +197,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
       });
       throw error;
     }
-  }, [loginData.employee.orgid, mapPatientToUI, toast]);
+  }, [handleRefreshPatients, toast]);
 
   const handleStartNewVisit = useCallback(async () => {
     if (!selectedPatient) return;
@@ -319,6 +327,8 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
             patients={patients}
             onSelectPatient={handleSelectPatient}
             onCreateNewPatient={handleCreateNewPatient}
+            onPatientUpdated={handleRefreshPatients}
+            onPatientDeleted={handleRefreshPatients}
           />
         );
       
