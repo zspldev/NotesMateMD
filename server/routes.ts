@@ -10,6 +10,14 @@ import {
 } from "@shared/schema";
 import multer from "multer";
 import { transcriptionService, type TranscriptionResult, type TranscriptionError } from "./transcription";
+import { 
+  formatTranscriptionToTemplate, 
+  getEmptyTemplate, 
+  NOTE_TEMPLATES, 
+  MEDICAL_ABBREVIATIONS, 
+  QUICK_INSERT_PHRASES,
+  type NoteTemplate 
+} from "./openai";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 
@@ -29,8 +37,38 @@ const upload = multer({
   }
 });
 
+// Helper function to detect database connection errors
+function isDatabaseConnectionError(error: any): boolean {
+  const errorMessage = error?.message?.toLowerCase() || '';
+  return (
+    errorMessage.includes('endpoint') ||
+    errorMessage.includes('disabled') ||
+    errorMessage.includes('connection') ||
+    errorMessage.includes('timeout') ||
+    errorMessage.includes('econnrefused') ||
+    errorMessage.includes('neon') ||
+    error?.code === 'ECONNREFUSED'
+  );
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
+  // Health check endpoint
+  app.get("/api/health", async (req, res) => {
+    try {
+      // Try a simple database query
+      await db.execute(sql`SELECT 1`);
+      res.json({ status: "healthy", database: "connected" });
+    } catch (error: any) {
+      console.error('Health check failed:', error);
+      res.status(503).json({ 
+        status: "unhealthy", 
+        database: "disconnected",
+        message: "Database is temporarily unavailable. Please try again in a moment."
+      });
+    }
+  });
+
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
@@ -54,9 +92,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         employee: employeeData,
         organization: org
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      res.status(500).json({ error: "Internal server error" });
+      if (isDatabaseConnectionError(error)) {
+        res.status(503).json({ error: "Database is temporarily unavailable. Please try again in a moment." });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
     }
   });
 
@@ -176,6 +218,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/patients/:patientid", async (req, res) => {
+    try {
+      const { patientid } = req.params;
+      
+      // Check if patient exists first
+      const patient = await storage.getPatient(patientid);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      // Delete patient and all associated records (visits, notes)
+      const deleted = await storage.deletePatient(patientid);
+      if (!deleted) {
+        return res.status(500).json({ error: "Failed to delete patient" });
+      }
+      
+      res.json({ success: true, message: "Patient and all associated records deleted successfully" });
+    } catch (error) {
+      console.error('Delete patient error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Visit routes
   app.get("/api/patients/:patientid/visits", async (req, res) => {
     try {
@@ -278,18 +343,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/notes", upload.single('audio'), async (req, res) => {
     try {
-      // Check if manual transcription was provided
-      const manualTranscription = req.body.transcription_text && req.body.transcription_text.trim().length > 0;
+      // Check if manual transcription was provided (must be non-empty after trimming)
+      const rawTranscription = req.body.transcription_text;
+      const trimmedTranscription = rawTranscription?.trim() || '';
+      const hasManualTranscription = trimmedTranscription.length > 0;
       
       const noteData: any = {
         visitid: req.body.visitid,
-        transcription_text: req.body.transcription_text || null,
-        is_transcription_edited: manualTranscription // Mark as edited if manually provided
+        transcription_text: hasManualTranscription ? trimmedTranscription : null,
+        is_transcription_edited: hasManualTranscription // Mark as edited if manually provided
       };
       
       console.log('POST /api/notes received:', {
         hasAudio: !!req.file,
-        hasManualTranscription: manualTranscription,
+        audioSize: req.file?.buffer?.length || 0,
+        audioMimeType: req.file?.mimetype || 'none',
+        rawTranscription: rawTranscription ? `"${rawTranscription.substring(0, 50)}..."` : 'undefined',
+        hasManualTranscription: hasManualTranscription,
         transcriptionLength: noteData.transcription_text?.length || 0
       });
 
@@ -301,8 +371,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         noteData.audio_duration_seconds = parseInt(req.body.audio_duration_seconds) || null;
 
         // Automatically transcribe audio using Deepgram if no manual transcription provided AND audio has content
-        if (!noteData.transcription_text && req.file.buffer && req.file.buffer.length > 0) {
-          console.log('Starting Deepgram transcription for audio file:', noteData.audio_filename);
+        const shouldTranscribe = !noteData.transcription_text && req.file.buffer && req.file.buffer.length > 1000;
+        console.log('Transcription check:', {
+          hasTranscriptionText: !!noteData.transcription_text,
+          hasBuffer: !!req.file.buffer,
+          bufferLength: req.file.buffer?.length || 0,
+          shouldTranscribe: shouldTranscribe
+        });
+
+        if (shouldTranscribe) {
+          console.log('Starting Deepgram transcription for audio file:', noteData.audio_filename, 'size:', req.file.buffer.length, 'bytes');
           
           try {
             const transcriptionResult = await transcriptionService.transcribeAudio(
@@ -311,7 +389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
             if ('error' in transcriptionResult) {
-              console.error('Deepgram transcription failed:', transcriptionResult.error);
+              console.error('Deepgram transcription failed:', transcriptionResult.error, transcriptionResult.details);
               // Continue without transcription rather than failing the entire request
               noteData.transcription_text = `[Transcription failed: ${transcriptionResult.error}]`;
             } else {
@@ -324,6 +402,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error('Deepgram service error:', transcriptionError);
             noteData.transcription_text = '[Automatic transcription unavailable]';
           }
+        } else if (!noteData.transcription_text) {
+          console.log('Skipping transcription - audio buffer too small or empty');
         }
       }
 
@@ -384,6 +464,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Transcription-only endpoint (doesn't save to database)
+  app.post("/api/transcribe", upload.single('audio'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No audio file provided" });
+      }
+
+      if (req.file.buffer.length < 1000) {
+        return res.status(400).json({ error: "Audio file too small to transcribe" });
+      }
+
+      console.log('Transcription-only request received:', {
+        audioSize: req.file.buffer.length,
+        mimeType: req.file.mimetype
+      });
+
+      const transcriptionResult = await transcriptionService.transcribeAudio(
+        req.file.buffer,
+        req.file.mimetype
+      );
+
+      if ('error' in transcriptionResult) {
+        console.error('Deepgram transcription failed:', transcriptionResult.error, transcriptionResult.details);
+        return res.status(500).json({ 
+          error: "Transcription failed", 
+          details: transcriptionResult.details 
+        });
+      }
+
+      console.log('Transcription-only completed:', transcriptionResult.text.length, 'characters');
+      
+      res.json({
+        text: transcriptionResult.text,
+        confidence: transcriptionResult.confidence,
+        duration: transcriptionResult.duration
+      });
+    } catch (error) {
+      console.error('Transcription error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Employee routes
   app.get("/api/employees/:empid", async (req, res) => {
     try {
@@ -400,6 +522,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Get employee error:', error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Medical Editor API routes
+  
+  // Get available note templates
+  app.get("/api/medical/templates", (req, res) => {
+    const templates = Object.entries(NOTE_TEMPLATES).map(([id, def]) => ({
+      id,
+      name: def.name,
+      sections: def.sections,
+      description: def.description
+    }));
+    res.json(templates);
+  });
+
+  // Get empty template structure
+  app.get("/api/medical/templates/:templateId/empty", (req, res) => {
+    const { templateId } = req.params;
+    if (!NOTE_TEMPLATES[templateId as NoteTemplate]) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+    const emptyTemplate = getEmptyTemplate(templateId as NoteTemplate);
+    res.json({ template: emptyTemplate });
+  });
+
+  // Get medical abbreviations
+  app.get("/api/medical/abbreviations", (req, res) => {
+    res.json(MEDICAL_ABBREVIATIONS);
+  });
+
+  // Get quick insert phrases
+  app.get("/api/medical/quick-phrases", (req, res) => {
+    res.json(QUICK_INSERT_PHRASES);
+  });
+
+  // AI-powered auto-format transcription to template
+  app.post("/api/medical/format", async (req, res) => {
+    try {
+      const { transcription, template } = req.body;
+      
+      if (!transcription || !template) {
+        return res.status(400).json({ error: "Transcription and template are required" });
+      }
+      
+      if (!NOTE_TEMPLATES[template as NoteTemplate]) {
+        return res.status(400).json({ error: "Invalid template type" });
+      }
+      
+      console.log(`Formatting transcription to ${template} template...`);
+      const formattedNote = await formatTranscriptionToTemplate(transcription, template as NoteTemplate);
+      console.log(`Formatting complete: ${formattedNote.length} characters`);
+      
+      res.json({ formattedNote });
+    } catch (error) {
+      console.error('Format transcription error:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to format transcription" });
     }
   });
 

@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Mic, Square, Play, Pause, Save, Edit3, Loader2, Bot, User } from "lucide-react";
+import { Mic, Square, Play, Pause, Save, Loader2, FileText } from "lucide-react";
+import MedicalEditor from "./MedicalEditor";
+import { api } from "@/lib/api";
 
 interface AudioRecorderProps {
   visitId?: string;
@@ -33,7 +34,6 @@ export default function AudioRecorder({
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [savedAudioBlob, setSavedAudioBlob] = useState<Blob | null>(null);
   const [transcription, setTranscription] = useState(existingTranscription);
-  const [isEditingTranscription, setIsEditingTranscription] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [transcriptionSource, setTranscriptionSource] = useState<'none' | 'auto' | 'manual'>('none');
@@ -125,47 +125,60 @@ export default function AudioRecorder({
   };
 
   const handleSave = async () => {
-    if (audioBlob || transcription.trim()) {
-      setIsSaving(true);
-      // Only show transcribing status if there's audio but no existing transcription
-      const needsTranscription = audioBlob && !transcription.trim();
-      if (needsTranscription) {
-        setIsTranscribing(true);
+    if (!transcription.trim()) {
+      console.log('No transcription to save');
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      // Save the transcription text (with audio if available and not yet saved)
+      const result = await onSaveNote(audioBlob, transcription);
+      
+      console.log('Note saved successfully');
+      
+      // Keep transcription visible after save
+      if (result.transcription_text) {
+        setTranscription(result.transcription_text);
+        setTranscriptionSource(result.ai_transcribed ? 'auto' : 'manual');
       }
       
-      try {
-        // Only send audio if it exists (don't send dummy blob for manual-only transcriptions)
-        const result = await onSaveNote(audioBlob!, transcription);
-        
-        console.log('Note saved with transcription');
-        
-        // Keep transcription visible after save (for both AI and manual notes)
-        if (result.transcription_text) {
-          setTranscription(result.transcription_text);
-          setTranscriptionSource(result.ai_transcribed ? 'auto' : 'manual');
-        } else {
-          // Only clear if no transcription exists
-          setTranscription('');
-          setTranscriptionSource('none');
-        }
-        
-        // Reset audio controls but preserve transcription
-        setAudioBlob(null);
-        setRecordingTime(0);
-        setIsEditingTranscription(false);
-        setIsPlaying(false);
-      } catch (error) {
-        console.error('Failed to save note:', error);
-      } finally {
-        setIsSaving(false);
-        setIsTranscribing(false);
-      }
+      // Reset audio controls and transcription after successful save
+      setAudioBlob(null);
+      setRecordingTime(0);
+      setIsPlaying(false);
+      setTranscription('');
+      setTranscriptionSource('none');
+    } catch (error) {
+      console.error('Failed to save note:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleTranscriptionChange = (value: string) => {
     setTranscription(value);
     setTranscriptionSource(value ? 'manual' : 'none');
+  };
+
+  // Transcribe audio without saving
+  const handleTranscribe = async () => {
+    if (!audioBlob) return;
+    
+    setIsTranscribing(true);
+    try {
+      const result = await api.transcribeAudio(audioBlob);
+      setTranscription(result.text);
+      setTranscriptionSource('auto');
+      console.log('Audio transcribed successfully:', result.text.length, 'characters');
+    } catch (error) {
+      console.error('Transcription failed:', error);
+      setTranscription('[Transcription failed. Please try again or type manually.]');
+      setTranscriptionSource('manual');
+    } finally {
+      setIsTranscribing(false);
+    }
   };
 
   // Convert Base64 audio to Blob when existing audio is provided
@@ -344,36 +357,9 @@ export default function AudioRecorder({
           </div>
         )}
 
-        {/* Transcription Section */}
+        {/* Medical Editor Section */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Notes/Audio Transcription</label>
-              {transcriptionSource === 'auto' && (
-                <Badge variant="secondary" className="text-xs">
-                  <Bot className="h-3 w-3 mr-1" />
-                  AI Generated
-                </Badge>
-              )}
-              {transcriptionSource === 'manual' && (
-                <Badge variant="outline" className="text-xs">
-                  <User className="h-3 w-3 mr-1" />
-                  Manual
-                </Badge>
-              )}
-            </div>
-            {!isReadOnly && (
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setIsEditingTranscription(!isEditingTranscription)}
-                data-testid="button-edit-transcription"
-                disabled={isTranscribing}
-              >
-                <Edit3 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          <label className="text-sm font-medium">Clinical Notes</label>
           
           {isTranscribing && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -382,52 +368,64 @@ export default function AudioRecorder({
             </div>
           )}
           
-          {isEditingTranscription ? (
-            <Textarea
-              value={transcription}
-              onChange={(e) => handleTranscriptionChange(e.target.value)}
-              placeholder="Edit transcription or add manual notes..."
-              className="min-h-[120px]"
-              data-testid="textarea-transcription"
-              disabled={isTranscribing}
-            />
-          ) : (
-            <div 
-              className="min-h-[120px] p-3 rounded-md border bg-muted/50 text-sm"
-              data-testid="text-transcription-display"
-            >
-              {transcription || (
-                <span className="text-muted-foreground">
-                  {isTranscribing ? 
-                    "Transcription in progress..." : 
-                    "No transcription available. Record audio or edit manually."
-                  }
-                </span>
-              )}
-            </div>
-          )}
+          <MedicalEditor
+            value={transcription}
+            onChange={handleTranscriptionChange}
+            disabled={isReadOnly}
+            isTranscribing={isTranscribing}
+            transcriptionSource={transcriptionSource}
+            onTranscriptionSourceChange={setTranscriptionSource}
+            placeholder="Record audio for automatic transcription, or use the tools above to create structured clinical notes..."
+          />
         </div>
 
-        {/* Save Button */}
-        {!isReadOnly && (audioBlob || transcription.trim()) && (
-          <Button 
-            onClick={handleSave}
-            className="w-full"
-            data-testid="button-save-note"
-            disabled={isSaving || isTranscribing}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {isTranscribing ? "Transcribing & Saving..." : "Saving..."}
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save Note
-              </>
+        {/* Action Buttons */}
+        {!isReadOnly && (
+          <div className="flex flex-col gap-2">
+            {/* Transcribe Button - only show when there's audio but no transcription */}
+            {audioBlob && !transcription.trim() && (
+              <Button 
+                onClick={handleTranscribe}
+                className="w-full bg-[#17a2b8] hover:bg-[#138496] text-white"
+                data-testid="button-transcribe"
+                disabled={isTranscribing}
+              >
+                {isTranscribing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Transcribing with Deepgram...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Transcribe Audio
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
+
+            {/* Save Button - only show when there's transcription text */}
+            {transcription.trim() && (
+              <Button 
+                onClick={handleSave}
+                className="w-full"
+                data-testid="button-save-note"
+                disabled={isSaving || isTranscribing}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Note
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

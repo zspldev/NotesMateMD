@@ -108,7 +108,7 @@ async function pushToGitHub() {
   const owner = 'zspldev';
   const repo = 'NotesMateMD';
   const branch = 'main';
-  const commitMessage = 'Update NotesMate MD - Audio playback fixes and improvements';
+  const commitMessage = 'Fix chronological ordering - flatten notes list with newest first';
 
   console.log('Connecting to GitHub...');
   const octokit = await getUncachableGitHubClient();

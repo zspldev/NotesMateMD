@@ -29,6 +29,7 @@ export interface IStorage {
   getPatient(patientid: string): Promise<Patient | undefined>;
   createPatient(patient: InsertPatientWithMRN): Promise<Patient>;
   updatePatient(patientid: string, updates: Partial<InsertPatient>): Promise<Patient | undefined>;
+  deletePatient(patientid: string): Promise<boolean>;
   searchPatients(orgid: string, query: string): Promise<Patient[]>;
 
   // Visit operations
@@ -290,6 +291,25 @@ export class MemStorage implements IStorage {
     return updatedPatient;
   }
 
+  async deletePatient(patientid: string): Promise<boolean> {
+    const patient = this.patients.get(patientid);
+    if (!patient) return false;
+    
+    // Delete all visit notes for all visits of this patient
+    const patientVisits = Array.from(this.visits.values()).filter(v => v.patientid === patientid);
+    for (const visit of patientVisits) {
+      const visitNotes = Array.from(this.visitNotes.values()).filter(n => n.visitid === visit.visitid);
+      for (const note of visitNotes) {
+        this.visitNotes.delete(note.noteid);
+      }
+      this.visits.delete(visit.visitid);
+    }
+    
+    // Delete the patient
+    this.patients.delete(patientid);
+    return true;
+  }
+
   async searchPatients(orgid: string, query: string): Promise<Patient[]> {
     const patients = await this.getPatients(orgid);
     if (!query) return patients;
@@ -434,6 +454,28 @@ export class DatabaseStorage implements IStorage {
       .where(eq(patients.patientid, patientid))
       .returning();
     return result[0];
+  }
+
+  async deletePatient(patientid: string): Promise<boolean> {
+    // First check if patient exists
+    const patient = await this.getPatient(patientid);
+    if (!patient) return false;
+    
+    // Get all visits for this patient
+    const patientVisits = await this.getVisits(patientid);
+    
+    // Delete all visit notes for each visit
+    for (const visit of patientVisits) {
+      await db.delete(visit_notes).where(eq(visit_notes.visitid, visit.visitid));
+    }
+    
+    // Delete all visits for this patient
+    await db.delete(visits).where(eq(visits.patientid, patientid));
+    
+    // Delete the patient
+    await db.delete(patients).where(eq(patients.patientid, patientid));
+    
+    return true;
   }
 
   async searchPatients(orgid: string, query: string): Promise<Patient[]> {

@@ -56,6 +56,7 @@ interface UINote {
   isTranscriptionEdited: boolean;
   aiTranscribed?: boolean;
   createdAt: string;
+  audioData?: string;
 }
 
 export default function Dashboard({ loginData, onLogout }: DashboardProps) {
@@ -116,7 +117,8 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
         transcriptionText: note.transcription_text || undefined,
         isTranscriptionEdited: isEdited,
         aiTranscribed: aiTranscribed,
-        createdAt: new Date(note.created_at).toISOString()
+        createdAt: new Date(note.created_at).toISOString(),
+        audioData: note.audio_file || undefined
       };
     }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }), []);
@@ -152,6 +154,24 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     try {
       const visitsData = await api.getPatientVisits(patientId);
       const uiVisits = visitsData.map(mapVisitToUI);
+      
+      // Sort visits by most recent activity (newest note or visit date if no notes)
+      uiVisits.sort((a, b) => {
+        // Get most recent note time for each visit
+        const aLatestNote = a.notes.length > 0 ? new Date(a.notes[0].createdAt).getTime() : 0;
+        const bLatestNote = b.notes.length > 0 ? new Date(b.notes[0].createdAt).getTime() : 0;
+        
+        // Use visit date as fallback
+        const aVisitDate = new Date(a.visitDate).getTime();
+        const bVisitDate = new Date(b.visitDate).getTime();
+        
+        // Compare by most recent activity (note time if available, otherwise visit date)
+        const aTime = aLatestNote || aVisitDate;
+        const bTime = bLatestNote || bVisitDate;
+        
+        return bTime - aTime; // Descending order (newest first)
+      });
+      
       setVisits(uiVisits);
     } catch (error) {
       console.error('Failed to load visits:', error);
@@ -165,6 +185,16 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     setIsNewPatientDialogOpen(true);
   }, []);
 
+  const handleRefreshPatients = useCallback(async () => {
+    try {
+      const patientsData = await api.getPatients(loginData.employee.orgid);
+      const uiPatients = patientsData.map(mapPatientToUI);
+      setPatients(uiPatients);
+    } catch (error) {
+      console.error('Failed to refresh patients:', error);
+    }
+  }, [loginData.employee.orgid, mapPatientToUI]);
+
   const handlePatientCreation = useCallback(async (patientData: InsertPatient) => {
     try {
       await api.createPatient(patientData);
@@ -175,9 +205,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
       });
 
       // Reload patients list
-      const patientsData = await api.getPatients(loginData.employee.orgid);
-      const uiPatients = patientsData.map(mapPatientToUI);
-      setPatients(uiPatients);
+      await handleRefreshPatients();
     } catch (error) {
       console.error('Failed to create patient:', error);
       toast({
@@ -187,16 +215,20 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
       });
       throw error;
     }
-  }, [loginData.employee.orgid, mapPatientToUI, toast]);
+  }, [handleRefreshPatients, toast]);
 
   const handleStartNewVisit = useCallback(async () => {
     if (!selectedPatient) return;
 
     try {
+      // Use local date (not UTC) to avoid timezone issues
+      const today = new Date();
+      const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      
       const newVisit = await api.createVisit({
         patientid: selectedPatient.patientid,
         empid: loginData.employee.empid,
-        visit_date: new Date().toISOString().split('T')[0],
+        visit_date: localDate,
         visit_purpose: null
       });
       
@@ -317,6 +349,8 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
             patients={patients}
             onSelectPatient={handleSelectPatient}
             onCreateNewPatient={handleCreateNewPatient}
+            onPatientUpdated={handleRefreshPatients}
+            onPatientDeleted={handleRefreshPatients}
           />
         );
       
