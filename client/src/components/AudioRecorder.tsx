@@ -386,8 +386,7 @@ export default function AudioRecorder({
             {audioBlob && !transcription.trim() && (
               <Button 
                 onClick={handleTranscribe}
-                variant="secondary"
-                className="w-full"
+                className="w-full bg-[#17a2b8] hover:bg-[#138496] text-white"
                 data-testid="button-transcribe"
                 disabled={isTranscribing}
               >

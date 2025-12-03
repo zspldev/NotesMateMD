@@ -59,7 +59,27 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB');
+    // Parse YYYY-MM-DD directly without creating Date object (avoids UTC interpretation)
+    const parts = dateString.split('T')[0].split('-');
+    if (parts.length === 3) {
+      const year = parts[0].slice(-2);
+      const month = parts[1];
+      const day = parts[2];
+      return `${day}/${month}/${year}`;
+    }
+    // Fallback for unexpected format
+    return dateString;
+  };
+  
+  const formatNoteDateTime = (createdAt: string) => {
+    const date = new Date(createdAt);
+    // Format date as DD/MM/YY
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    // Format time in local timezone
+    const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${day}/${month}/${year} at ${time}`;
   };
 
   const handlePlayPause = async (note: VisitNote) => {
@@ -196,7 +216,7 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Clock className="h-4 w-4" />
                             <span data-testid={`text-note-time-${note.noteId}`}>
-                              {new Date(note.createdAt).toLocaleTimeString()}
+                              {formatNoteDateTime(note.createdAt)}
                             </span>
                             {note.audioDurationSeconds && (
                               <>

@@ -154,6 +154,24 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     try {
       const visitsData = await api.getPatientVisits(patientId);
       const uiVisits = visitsData.map(mapVisitToUI);
+      
+      // Sort visits by most recent activity (newest note or visit date if no notes)
+      uiVisits.sort((a, b) => {
+        // Get most recent note time for each visit
+        const aLatestNote = a.notes.length > 0 ? new Date(a.notes[0].createdAt).getTime() : 0;
+        const bLatestNote = b.notes.length > 0 ? new Date(b.notes[0].createdAt).getTime() : 0;
+        
+        // Use visit date as fallback
+        const aVisitDate = new Date(a.visitDate).getTime();
+        const bVisitDate = new Date(b.visitDate).getTime();
+        
+        // Compare by most recent activity (note time if available, otherwise visit date)
+        const aTime = aLatestNote || aVisitDate;
+        const bTime = bLatestNote || bVisitDate;
+        
+        return bTime - aTime; // Descending order (newest first)
+      });
+      
       setVisits(uiVisits);
     } catch (error) {
       console.error('Failed to load visits:', error);
@@ -203,10 +221,14 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     if (!selectedPatient) return;
 
     try {
+      // Use local date (not UTC) to avoid timezone issues
+      const today = new Date();
+      const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      
       const newVisit = await api.createVisit({
         patientid: selectedPatient.patientid,
         empid: loginData.employee.empid,
-        visit_date: new Date().toISOString().split('T')[0],
+        visit_date: localDate,
         visit_purpose: null
       });
       
