@@ -343,18 +343,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/notes", upload.single('audio'), async (req, res) => {
     try {
-      // Check if manual transcription was provided
-      const manualTranscription = req.body.transcription_text && req.body.transcription_text.trim().length > 0;
+      // Check if manual transcription was provided (must be non-empty after trimming)
+      const rawTranscription = req.body.transcription_text;
+      const trimmedTranscription = rawTranscription?.trim() || '';
+      const hasManualTranscription = trimmedTranscription.length > 0;
       
       const noteData: any = {
         visitid: req.body.visitid,
-        transcription_text: req.body.transcription_text || null,
-        is_transcription_edited: manualTranscription // Mark as edited if manually provided
+        transcription_text: hasManualTranscription ? trimmedTranscription : null,
+        is_transcription_edited: hasManualTranscription // Mark as edited if manually provided
       };
       
       console.log('POST /api/notes received:', {
         hasAudio: !!req.file,
-        hasManualTranscription: manualTranscription,
+        audioSize: req.file?.buffer?.length || 0,
+        audioMimeType: req.file?.mimetype || 'none',
+        rawTranscription: rawTranscription ? `"${rawTranscription.substring(0, 50)}..."` : 'undefined',
+        hasManualTranscription: hasManualTranscription,
         transcriptionLength: noteData.transcription_text?.length || 0
       });
 
@@ -366,8 +371,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         noteData.audio_duration_seconds = parseInt(req.body.audio_duration_seconds) || null;
 
         // Automatically transcribe audio using Deepgram if no manual transcription provided AND audio has content
-        if (!noteData.transcription_text && req.file.buffer && req.file.buffer.length > 0) {
-          console.log('Starting Deepgram transcription for audio file:', noteData.audio_filename);
+        const shouldTranscribe = !noteData.transcription_text && req.file.buffer && req.file.buffer.length > 1000;
+        console.log('Transcription check:', {
+          hasTranscriptionText: !!noteData.transcription_text,
+          hasBuffer: !!req.file.buffer,
+          bufferLength: req.file.buffer?.length || 0,
+          shouldTranscribe: shouldTranscribe
+        });
+
+        if (shouldTranscribe) {
+          console.log('Starting Deepgram transcription for audio file:', noteData.audio_filename, 'size:', req.file.buffer.length, 'bytes');
           
           try {
             const transcriptionResult = await transcriptionService.transcribeAudio(
@@ -376,7 +389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
             if ('error' in transcriptionResult) {
-              console.error('Deepgram transcription failed:', transcriptionResult.error);
+              console.error('Deepgram transcription failed:', transcriptionResult.error, transcriptionResult.details);
               // Continue without transcription rather than failing the entire request
               noteData.transcription_text = `[Transcription failed: ${transcriptionResult.error}]`;
             } else {
@@ -389,6 +402,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error('Deepgram service error:', transcriptionError);
             noteData.transcription_text = '[Automatic transcription unavailable]';
           }
+        } else if (!noteData.transcription_text) {
+          console.log('Skipping transcription - audio buffer too small or empty');
         }
       }
 
