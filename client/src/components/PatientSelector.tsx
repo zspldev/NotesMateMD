@@ -333,7 +333,7 @@ export default function PatientSelector({ patients, onSelectPatient, onCreateNew
                   </TableHead>
                   <TableHead className="w-[100px] font-bold">Gender</TableHead>
                   <TableHead className="w-[80px] text-center font-bold">Age</TableHead>
-                  <TableHead className="w-[140px] font-bold">Phone</TableHead>
+                  <TableHead className="w-[140px] font-bold">Phone/Email</TableHead>
                   <TableHead className="w-[120px] font-bold">Last Visit</TableHead>
                 </TableRow>
               </TableHeader>
