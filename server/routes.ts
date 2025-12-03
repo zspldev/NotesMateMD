@@ -464,6 +464,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Transcription-only endpoint (doesn't save to database)
+  app.post("/api/transcribe", upload.single('audio'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No audio file provided" });
+      }
+
+      if (req.file.buffer.length < 1000) {
+        return res.status(400).json({ error: "Audio file too small to transcribe" });
+      }
+
+      console.log('Transcription-only request received:', {
+        audioSize: req.file.buffer.length,
+        mimeType: req.file.mimetype
+      });
+
+      const transcriptionResult = await transcriptionService.transcribeAudio(
+        req.file.buffer,
+        req.file.mimetype
+      );
+
+      if ('error' in transcriptionResult) {
+        console.error('Deepgram transcription failed:', transcriptionResult.error, transcriptionResult.details);
+        return res.status(500).json({ 
+          error: "Transcription failed", 
+          details: transcriptionResult.details 
+        });
+      }
+
+      console.log('Transcription-only completed:', transcriptionResult.text.length, 'characters');
+      
+      res.json({
+        text: transcriptionResult.text,
+        confidence: transcriptionResult.confidence,
+        duration: transcriptionResult.duration
+      });
+    } catch (error) {
+      console.error('Transcription error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Employee routes
   app.get("/api/employees/:empid", async (req, res) => {
     try {

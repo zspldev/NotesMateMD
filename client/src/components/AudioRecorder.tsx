@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Square, Play, Pause, Save, Loader2 } from "lucide-react";
+import { Mic, Square, Play, Pause, Save, Loader2, FileText } from "lucide-react";
 import MedicalEditor from "./MedicalEditor";
+import { api } from "@/lib/api";
 
 interface AudioRecorderProps {
   visitId?: string;
@@ -124,46 +125,60 @@ export default function AudioRecorder({
   };
 
   const handleSave = async () => {
-    if (audioBlob || transcription.trim()) {
-      setIsSaving(true);
-      // Only show transcribing status if there's audio but no existing transcription
-      const needsTranscription = audioBlob && !transcription.trim();
-      if (needsTranscription) {
-        setIsTranscribing(true);
+    if (!transcription.trim()) {
+      console.log('No transcription to save');
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      // Save the transcription text (with audio if available and not yet saved)
+      const result = await onSaveNote(audioBlob, transcription);
+      
+      console.log('Note saved successfully');
+      
+      // Keep transcription visible after save
+      if (result.transcription_text) {
+        setTranscription(result.transcription_text);
+        setTranscriptionSource(result.ai_transcribed ? 'auto' : 'manual');
       }
       
-      try {
-        // Only send audio if it exists (don't send dummy blob for manual-only transcriptions)
-        const result = await onSaveNote(audioBlob!, transcription);
-        
-        console.log('Note saved with transcription');
-        
-        // Keep transcription visible after save (for both AI and manual notes)
-        if (result.transcription_text) {
-          setTranscription(result.transcription_text);
-          setTranscriptionSource(result.ai_transcribed ? 'auto' : 'manual');
-        } else {
-          // Only clear if no transcription exists
-          setTranscription('');
-          setTranscriptionSource('none');
-        }
-        
-        // Reset audio controls but preserve transcription
-        setAudioBlob(null);
-        setRecordingTime(0);
-        setIsPlaying(false);
-      } catch (error) {
-        console.error('Failed to save note:', error);
-      } finally {
-        setIsSaving(false);
-        setIsTranscribing(false);
-      }
+      // Reset audio controls and transcription after successful save
+      setAudioBlob(null);
+      setRecordingTime(0);
+      setIsPlaying(false);
+      setTranscription('');
+      setTranscriptionSource('none');
+    } catch (error) {
+      console.error('Failed to save note:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleTranscriptionChange = (value: string) => {
     setTranscription(value);
     setTranscriptionSource(value ? 'manual' : 'none');
+  };
+
+  // Transcribe audio without saving
+  const handleTranscribe = async () => {
+    if (!audioBlob) return;
+    
+    setIsTranscribing(true);
+    try {
+      const result = await api.transcribeAudio(audioBlob);
+      setTranscription(result.text);
+      setTranscriptionSource('auto');
+      console.log('Audio transcribed successfully:', result.text.length, 'characters');
+    } catch (error) {
+      console.error('Transcription failed:', error);
+      setTranscription('[Transcription failed. Please try again or type manually.]');
+      setTranscriptionSource('manual');
+    } finally {
+      setIsTranscribing(false);
+    }
   };
 
   // Convert Base64 audio to Blob when existing audio is provided
@@ -364,26 +379,54 @@ export default function AudioRecorder({
           />
         </div>
 
-        {/* Save Button */}
-        {!isReadOnly && (audioBlob || transcription.trim()) && (
-          <Button 
-            onClick={handleSave}
-            className="w-full"
-            data-testid="button-save-note"
-            disabled={isSaving || isTranscribing}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {isTranscribing ? "Transcribing & Saving..." : "Saving..."}
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save Note
-              </>
+        {/* Action Buttons */}
+        {!isReadOnly && (
+          <div className="flex flex-col gap-2">
+            {/* Transcribe Button - only show when there's audio but no transcription */}
+            {audioBlob && !transcription.trim() && (
+              <Button 
+                onClick={handleTranscribe}
+                variant="secondary"
+                className="w-full"
+                data-testid="button-transcribe"
+                disabled={isTranscribing}
+              >
+                {isTranscribing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Transcribing with Deepgram...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Transcribe Audio
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
+
+            {/* Save Button - only show when there's transcription text */}
+            {transcription.trim() && (
+              <Button 
+                onClick={handleSave}
+                className="w-full"
+                data-testid="button-save-note"
+                disabled={isSaving || isTranscribing}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Note
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

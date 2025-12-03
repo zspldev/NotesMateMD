@@ -227,6 +227,34 @@ class ApiClient {
     return `${this.baseUrl}/notes/${noteid}/audio`;
   }
 
+  // Transcription-only (doesn't save to database)
+  async transcribeAudio(audioBlob: Blob): Promise<{ text: string; confidence: number; duration?: number }> {
+    const formData = new FormData();
+    
+    // Use proper file extension based on MIME type
+    const getFileExtension = (mimeType: string): string => {
+      if (mimeType.includes('webm')) return 'webm';
+      if (mimeType.includes('mp4')) return 'm4a';
+      if (mimeType.includes('ogg')) return 'ogg';
+      return 'wav';
+    };
+    
+    const extension = getFileExtension(audioBlob.type);
+    formData.append('audio', audioBlob, `recording.${extension}`);
+
+    const response = await fetch(`${this.baseUrl}/transcribe`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Transcription failed: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
   // Employee
   async getEmployee(empid: string): Promise<Omit<LoginResponse['employee'], 'created_at'>> {
     return this.request<Omit<LoginResponse['employee'], 'created_at'>>(`/employees/${empid}`);
