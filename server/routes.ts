@@ -18,6 +18,7 @@ import {
   QUICK_INSERT_PHRASES,
   type NoteTemplate 
 } from "./openai";
+import { generatePatientNotesPDF, generatePatientNotesFilename } from "./pdf-service";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 
@@ -238,6 +239,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Delete patient error:', error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // PDF Export route
+  app.get("/api/patients/:patientid/notes/export", async (req, res) => {
+    try {
+      const { patientid } = req.params;
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "Start date and end date are required" });
+      }
+      
+      const data = await storage.getPatientNotesByDateRange(
+        patientid, 
+        startDate as string, 
+        endDate as string
+      );
+      
+      if (!data) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      const filename = generatePatientNotesFilename(patientid, startDate as string, endDate as string);
+      
+      // Generate PDF
+      const doc = generatePatientNotesPDF({
+        ...data,
+        startDate: startDate as string,
+        endDate: endDate as string
+      });
+      
+      // Set response headers for PDF download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      // Pipe PDF to response
+      doc.pipe(res);
+      doc.end();
+    } catch (error) {
+      console.error('PDF export error:', error);
+      res.status(500).json({ error: "Failed to generate PDF export" });
     }
   });
 
