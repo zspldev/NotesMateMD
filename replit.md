@@ -106,6 +106,14 @@ Preferred communication style: Simple, everyday language.
   - Edit patient dialog for updating patient information
   - Delete patient with cascade deletion (removes all visits and notes)
   - Confirmation dialog with warning about permanent data deletion
+- **PDF Export Feature**: Export patient clinical notes as professional PDF documents
+  - Date range selection with quick presets (Today, Last 7 Days, Last 30 Days, This Month, Last Month)
+  - Custom date range selection via calendar date pickers
+  - Professional medical document layout with organization header, patient information, and chronological notes
+  - Includes AI-generated/edited badges, provider information, and audio duration
+  - Page numbers and confidential footer on each page
+  - Files: `server/pdf-service.ts`, `client/src/components/ExportPDFDialog.tsx`
+  - API endpoint: `GET /api/patients/:patientid/notes/export?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`
 
 ### Known Technical Considerations
 - **Security Enhancement Opportunity**: Currently, the backend accepts orgid from client request body. Future improvement should derive orgid from authenticated session to prevent potential tampering.
