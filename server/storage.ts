@@ -8,7 +8,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
-import { eq, desc, and, ilike, or } from "drizzle-orm";
+import { eq, desc, and, ilike, or, gte, lte, sql } from "drizzle-orm";
 import { db } from "./db";
 
 export interface IStorage {
@@ -42,6 +42,17 @@ export interface IStorage {
   getVisitNote(noteid: string): Promise<VisitNote | undefined>;
   createVisitNote(note: InsertVisitNote): Promise<VisitNote>;
   updateVisitNote(noteid: string, updates: Partial<InsertVisitNote>): Promise<VisitNote | undefined>;
+  
+  // Export operations
+  getPatientNotesByDateRange(patientid: string, startDate: string, endDate: string): Promise<{
+    patient: Patient;
+    org: Org;
+    notes: Array<{
+      note: VisitNote;
+      visit: Visit;
+      employee: Employee;
+    }>;
+  } | null>;
 }
 
 export class MemStorage implements IStorage {
@@ -387,6 +398,51 @@ export class MemStorage implements IStorage {
     this.visitNotes.set(noteid, updatedNote);
     return updatedNote;
   }
+
+  async getPatientNotesByDateRange(patientid: string, startDate: string, endDate: string): Promise<{
+    patient: Patient;
+    org: Org;
+    notes: Array<{
+      note: VisitNote;
+      visit: Visit;
+      employee: Employee;
+    }>;
+  } | null> {
+    const patient = this.patients.get(patientid);
+    if (!patient) return null;
+    
+    const org = this.orgs.get(patient.orgid);
+    if (!org) return null;
+    
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    
+    const patientVisits = Array.from(this.visits.values()).filter(v => v.patientid === patientid);
+    const notesWithContext: Array<{ note: VisitNote; visit: Visit; employee: Employee }> = [];
+    
+    for (const visit of patientVisits) {
+      const employee = this.employees.get(visit.empid);
+      if (!employee) continue;
+      
+      const visitNotes = Array.from(this.visitNotes.values()).filter(n => {
+        if (n.visitid !== visit.visitid) return false;
+        const noteDate = new Date(n.created_at || 0);
+        return noteDate >= start && noteDate <= end;
+      });
+      
+      for (const note of visitNotes) {
+        notesWithContext.push({ note, visit, employee });
+      }
+    }
+    
+    notesWithContext.sort((a, b) => 
+      new Date(b.note.created_at || 0).getTime() - new Date(a.note.created_at || 0).getTime()
+    );
+    
+    return { patient, org, notes: notesWithContext };
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -542,6 +598,62 @@ export class DatabaseStorage implements IStorage {
       .where(eq(visit_notes.noteid, noteid))
       .returning();
     return result[0];
+  }
+
+  async getPatientNotesByDateRange(patientid: string, startDate: string, endDate: string): Promise<{
+    patient: Patient;
+    org: Org;
+    notes: Array<{
+      note: VisitNote;
+      visit: Visit;
+      employee: Employee;
+    }>;
+  } | null> {
+    const patient = await this.getPatient(patientid);
+    if (!patient) return null;
+    
+    const org = await this.getOrg(patient.orgid);
+    if (!org) return null;
+    
+    // Build date range for filtering
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    
+    // Get all visits for this patient
+    const patientVisits = await this.getVisits(patientid);
+    
+    // Collect notes with context
+    const notesWithContext: Array<{ note: VisitNote; visit: Visit; employee: Employee }> = [];
+    
+    for (const visit of patientVisits) {
+      const employee = await this.getEmployee(visit.empid);
+      if (!employee) continue;
+      
+      // Get notes for this visit within date range
+      const visitNotes = await db.select()
+        .from(visit_notes)
+        .where(
+          and(
+            eq(visit_notes.visitid, visit.visitid),
+            gte(visit_notes.created_at, start),
+            lte(visit_notes.created_at, end)
+          )
+        )
+        .orderBy(desc(visit_notes.created_at));
+      
+      for (const note of visitNotes) {
+        notesWithContext.push({ note, visit, employee });
+      }
+    }
+    
+    // Sort all notes by created_at descending (newest first)
+    notesWithContext.sort((a, b) => 
+      new Date(b.note.created_at || 0).getTime() - new Date(a.note.created_at || 0).getTime()
+    );
+    
+    return { patient, org, notes: notesWithContext };
   }
 }
 
