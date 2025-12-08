@@ -12,13 +12,15 @@ import {
   Stethoscope, 
   LogOut,
   ArrowLeft,
-  Loader2
+  Loader2,
+  Download
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import PatientSelector from "./PatientSelector";
 import VisitHistory from "./VisitHistory";
 import AudioRecorder from "./AudioRecorder";
 import NewPatientDialog from "./NewPatientDialog";
+import ExportPDFDialog from "./ExportPDFDialog";
 import { useToast } from "@/hooks/use-toast";
 import { api, type LoginResponse, type Patient, type Visit } from "../lib/api";
 import type { InsertPatient } from "@shared/schema";
@@ -71,6 +73,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [isNewPatientDialogOpen, setIsNewPatientDialogOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   const currentUser = {
     firstName: loginData.employee.first_name,
@@ -378,6 +381,14 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
                       <Calendar className="h-4 w-4 mr-2" />
                       New Visit
                     </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsExportDialogOpen(true)}
+                      data-testid="button-export-notes"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export PDF
+                    </Button>
                     <Button 
                       variant="outline" 
                       onClick={() => setCurrentView('select')}
@@ -510,6 +521,16 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
         onCreatePatient={handlePatientCreation}
         orgId={loginData.employee.orgid}
       />
+
+      {/* Export PDF Dialog */}
+      {selectedPatient && (
+        <ExportPDFDialog
+          open={isExportDialogOpen}
+          onOpenChange={setIsExportDialogOpen}
+          patientId={selectedPatient.patientid}
+          patientName={`${selectedPatient.first_name} ${selectedPatient.last_name}`}
+        />
+      )}
     </div>
   );
 }
