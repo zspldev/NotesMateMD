@@ -193,31 +193,31 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
                 data-testid={`note-${note.noteId}`}
               >
                 {/* Note Header with Date/Time */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm flex-wrap">
+                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="font-medium" data-testid={`text-note-time-${note.noteId}`}>
                       {formatNoteDateTime(note.createdAt)}
                     </span>
                     {note.audioDurationSeconds && (
                       <>
-                        <span className="text-muted-foreground">•</span>
-                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground hidden sm:inline">•</span>
+                        <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
                         <span className="text-muted-foreground" data-testid={`text-audio-duration-${note.noteId}`}>
                           {formatDuration(note.audioDurationSeconds)}
                         </span>
                       </>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {note.aiTranscribed && (
                       <Badge variant="secondary" className="text-xs" data-testid={`badge-ai-transcribed-${note.noteId}`}>
                         <Bot className="h-3 w-3 mr-1" />
-                        AI Generated
+                        AI
                       </Badge>
                     )}
                     {note.isTranscriptionEdited && (
-                      <Badge variant="secondary">Edited</Badge>
+                      <Badge variant="secondary" className="text-xs">Edited</Badge>
                     )}
                   </div>
                 </div>

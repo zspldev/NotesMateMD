@@ -449,89 +449,96 @@ export default function PatientSelector({
       ) : (
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[120px]">
-                    <button
-                      className="flex items-center font-bold hover:text-foreground transition-colors"
-                      onClick={() => handleSort('mrn')}
-                      data-testid="button-sort-mrn"
-                    >
-                      MRN
-                      {getSortIcon('mrn')}
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button
-                      className="flex items-center font-bold hover:text-foreground transition-colors"
-                      onClick={() => handleSort('name')}
-                      data-testid="button-sort-name"
-                    >
-                      Patient Name
-                      {getSortIcon('name')}
-                    </button>
-                  </TableHead>
-                  <TableHead className="w-[100px] font-bold">Gender</TableHead>
-                  <TableHead className="w-[80px] text-center font-bold">Age</TableHead>
-                  <TableHead className="w-[160px] font-bold">Phone/Email</TableHead>
-                  <TableHead className="w-[120px] font-bold">Last Visit</TableHead>
-                  <TableHead className="w-[100px] font-bold text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAndSortedPatients.map((patient) => (
-                  <TableRow 
-                    key={patient.patientId}
-                    className="cursor-pointer hover-elevate"
-                    onClick={() => onSelectPatient(patient.patientId)}
-                    data-testid={`row-patient-${patient.patientId}`}
-                  >
-                    <TableCell className="font-normal" data-testid={`text-mrn-${patient.patientId}`}>
-                      {patient.patientId}
-                    </TableCell>
-                    <TableCell className="font-normal" data-testid={`text-patient-name-${patient.patientId}`}>
-                      {patient.firstName} {patient.lastName}
-                    </TableCell>
-                    <TableCell className="font-normal" data-testid={`text-gender-${patient.patientId}`}>
-                      <Badge variant="outline" className="font-normal">
-                        {patient.gender}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center font-normal" data-testid={`text-age-${patient.patientId}`}>
-                      {calculateAge(patient.dateOfBirth)}
-                    </TableCell>
-                    <TableCell className="font-normal text-muted-foreground" data-testid={`text-phone-${patient.patientId}`}>
-                      {patient.contactInfo || "-"}
-                    </TableCell>
-                    <TableCell className="font-normal text-muted-foreground" data-testid={`text-last-visit-${patient.patientId}`}>
-                      {formatDate(patient.lastVisit)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => handleEditClick(e, patient)}
-                          data-testid={`button-edit-patient-${patient.patientId}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => handleDeleteClick(e, patient)}
-                          className="text-destructive hover:text-destructive"
-                          data-testid={`button-delete-patient-${patient.patientId}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px] min-w-[100px]">
+                      <button
+                        className="flex items-center font-bold hover:text-foreground transition-colors"
+                        onClick={() => handleSort('mrn')}
+                        data-testid="button-sort-mrn"
+                      >
+                        MRN
+                        {getSortIcon('mrn')}
+                      </button>
+                    </TableHead>
+                    <TableHead className="min-w-[140px]">
+                      <button
+                        className="flex items-center font-bold hover:text-foreground transition-colors"
+                        onClick={() => handleSort('name')}
+                        data-testid="button-sort-name"
+                      >
+                        Patient Name
+                        {getSortIcon('name')}
+                      </button>
+                    </TableHead>
+                    <TableHead className="w-[80px] min-w-[80px] font-bold hidden sm:table-cell">Gender</TableHead>
+                    <TableHead className="w-[60px] min-w-[60px] text-center font-bold">Age</TableHead>
+                    <TableHead className="w-[140px] min-w-[140px] font-bold hidden md:table-cell">Phone/Email</TableHead>
+                    <TableHead className="w-[100px] min-w-[100px] font-bold hidden lg:table-cell">Last Visit</TableHead>
+                    <TableHead className="w-[80px] min-w-[80px] font-bold text-center">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredAndSortedPatients.map((patient) => (
+                    <TableRow 
+                      key={patient.patientId}
+                      className="cursor-pointer hover-elevate"
+                      onClick={() => onSelectPatient(patient.patientId)}
+                      data-testid={`row-patient-${patient.patientId}`}
+                    >
+                      <TableCell className="font-normal" data-testid={`text-mrn-${patient.patientId}`}>
+                        {patient.patientId}
+                      </TableCell>
+                      <TableCell className="font-normal" data-testid={`text-patient-name-${patient.patientId}`}>
+                        <div>
+                          <span>{patient.firstName} {patient.lastName}</span>
+                          <span className="sm:hidden text-xs text-muted-foreground block">
+                            {patient.gender}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-normal hidden sm:table-cell" data-testid={`text-gender-${patient.patientId}`}>
+                        <Badge variant="outline" className="font-normal">
+                          {patient.gender}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center font-normal" data-testid={`text-age-${patient.patientId}`}>
+                        {calculateAge(patient.dateOfBirth)}
+                      </TableCell>
+                      <TableCell className="font-normal text-muted-foreground hidden md:table-cell" data-testid={`text-phone-${patient.patientId}`}>
+                        {patient.contactInfo || "-"}
+                      </TableCell>
+                      <TableCell className="font-normal text-muted-foreground hidden lg:table-cell" data-testid={`text-last-visit-${patient.patientId}`}>
+                        {formatDate(patient.lastVisit)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => handleEditClick(e, patient)}
+                            data-testid={`button-edit-patient-${patient.patientId}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => handleDeleteClick(e, patient)}
+                            className="text-destructive hover:text-destructive"
+                            data-testid={`button-delete-patient-${patient.patientId}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

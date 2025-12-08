@@ -362,7 +362,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
                     <CardTitle data-testid="text-selected-patient-name">
                       {selectedPatient?.first_name} {selectedPatient?.last_name}
@@ -373,10 +373,11 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
                       }
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button 
                       onClick={handleStartNewVisit}
                       data-testid="button-start-new-visit"
+                      className="flex-1 sm:flex-none"
                     >
                       <Calendar className="h-4 w-4 mr-2" />
                       New Visit
@@ -385,6 +386,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
                       variant="outline"
                       onClick={() => setIsExportDialogOpen(true)}
                       data-testid="button-export-notes"
+                      className="flex-1 sm:flex-none"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Export PDF
@@ -393,9 +395,10 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
                       variant="outline" 
                       onClick={() => setCurrentView('select')}
                       data-testid="button-back-to-patients"
+                      className="flex-1 sm:flex-none"
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to Patients
+                      Back
                     </Button>
                   </div>
                 </div>
@@ -416,7 +419,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
                     <CardTitle>New Visit</CardTitle>
                     <p className="text-sm text-muted-foreground">
@@ -430,6 +433,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
                     variant="outline" 
                     onClick={() => setCurrentView('history')}
                     data-testid="button-back-to-history"
+                    className="w-full sm:w-auto"
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to History
@@ -459,20 +463,38 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold" style={{ color: '#17a2b8' }} data-testid="text-app-title">
+                <h1 className="text-xl sm:text-2xl font-bold" style={{ color: '#17a2b8' }} data-testid="text-app-title">
                   NotesMate MD
                 </h1>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
                   Medical Audio Notes & Transcription
                 </p>
               </div>
+              <div className="flex items-center gap-2 sm:hidden">
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={toggleTheme}
+                  data-testid="button-theme-toggle-mobile"
+                >
+                  {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={onLogout}
+                  data-testid="button-logout-mobile"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <div className="text-right">
@@ -504,6 +526,17 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
+            </div>
+            
+            <div className="flex sm:hidden items-center gap-2 text-sm">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium" data-testid="text-user-name-mobile">
+                {currentUser.firstName} {currentUser.lastName}
+              </span>
+              <span className="text-muted-foreground">•</span>
+              <span className="text-muted-foreground text-xs" data-testid="text-user-title-mobile">
+                {currentUser.title}
+              </span>
             </div>
           </div>
         </div>
