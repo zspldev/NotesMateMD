@@ -157,9 +157,14 @@ function drawPatientInfo(doc: PDFKit.PDFDocument, data: PDFExportData, pageWidth
 }
 
 function drawNotes(doc: PDFKit.PDFDocument, notes: NoteWithContext[], pageWidth: number) {
+  const leftMargin = doc.page.margins.left;
+  
+  // Reset x position to left margin
+  doc.x = leftMargin;
+  
   doc.fontSize(14)
      .fillColor(COLORS.text)
-     .text(`VISIT NOTES (${notes.length} total)`, { underline: true });
+     .text(`VISIT NOTES (${notes.length} total)`, leftMargin, doc.y, { underline: true });
 
   doc.moveDown(0.5);
 
@@ -171,21 +176,24 @@ function drawNotes(doc: PDFKit.PDFDocument, notes: NoteWithContext[], pageWidth:
       doc.addPage();
     }
 
+    // Reset x position for each note
+    doc.x = leftMargin;
+
     // Note header with date/time
     const noteDate = formatDateTime(note.created_at);
     
     doc.fontSize(11)
        .fillColor(COLORS.primary)
-       .text(`NOTE ${i + 1} - ${noteDate}`, { continued: false });
+       .text(`NOTE ${i + 1} - ${noteDate}`, leftMargin, doc.y);
 
     // Provider info
     doc.fontSize(10)
        .fillColor(COLORS.muted)
-       .text(`Provider: ${employee.first_name} ${employee.last_name} (${employee.title || 'Staff'})`);
+       .text(`Provider: ${employee.first_name} ${employee.last_name} (${employee.title || 'Staff'})`, leftMargin, doc.y);
     
     // Visit purpose
     if (visit.visit_purpose) {
-      doc.text(`Visit Purpose: ${visit.visit_purpose}`);
+      doc.text(`Visit Purpose: ${visit.visit_purpose}`, leftMargin, doc.y);
     }
 
     // Badges
@@ -195,7 +203,7 @@ function drawNotes(doc: PDFKit.PDFDocument, notes: NoteWithContext[], pageWidth:
     if (note.audio_filename) badges.push(`Audio: ${note.audio_duration_seconds || 0}s`);
     
     if (badges.length > 0) {
-      doc.text(`[${badges.join('] [')}]`);
+      doc.text(`[${badges.join('] [')}]`, leftMargin, doc.y);
     }
 
     doc.moveDown(0.3);
@@ -205,18 +213,15 @@ function drawNotes(doc: PDFKit.PDFDocument, notes: NoteWithContext[], pageWidth:
        .fillColor(COLORS.text);
     
     if (note.transcription_text) {
-      // Draw a light background for transcription
-      const textStartY = doc.y;
       const transcriptionText = note.transcription_text;
       
-      doc.text(transcriptionText, {
-        width: pageWidth - 20,
-        align: 'left',
-        indent: 10
+      doc.text(transcriptionText, leftMargin + 10, doc.y, {
+        width: pageWidth - 10,
+        align: 'left'
       });
     } else {
       doc.fillColor(COLORS.muted)
-         .text('No transcription available', { indent: 10 });
+         .text('No transcription available', leftMargin + 10, doc.y);
     }
 
     doc.moveDown(1);
@@ -226,7 +231,7 @@ function drawNotes(doc: PDFKit.PDFDocument, notes: NoteWithContext[], pageWidth:
       const y = doc.y;
       doc.strokeColor(COLORS.border)
          .lineWidth(0.5)
-         .moveTo(doc.page.margins.left, y)
+         .moveTo(leftMargin, y)
          .lineTo(doc.page.width - doc.page.margins.right, y)
          .stroke();
       doc.moveDown(0.5);
