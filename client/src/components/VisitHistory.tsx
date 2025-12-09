@@ -8,6 +8,7 @@ interface VisitNote {
   noteId: string;
   audioFilename?: string;
   audioDurationSeconds?: number;
+  audioMimeType?: string;
   transcriptionText?: string;
   isTranscriptionEdited: boolean;
   aiTranscribed?: boolean;
@@ -138,7 +139,10 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
-      const blob = new Blob([bytes], { type: 'audio/webm' });
+      // Use the actual MIME type from the note, falling back to common formats
+      const mimeType = note.audioMimeType || 'audio/webm';
+      console.log('Playing audio with MIME type:', mimeType);
+      const blob = new Blob([bytes], { type: mimeType });
       const audioUrl = URL.createObjectURL(blob);
       audioUrlRef.current = audioUrl;
 

@@ -54,6 +54,7 @@ interface UINote {
   noteId: string;
   audioFilename?: string;
   audioDurationSeconds?: number;
+  audioMimeType?: string;
   transcriptionText?: string;
   isTranscriptionEdited: boolean;
   aiTranscribed?: boolean;
@@ -117,6 +118,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
         noteId: note.noteid,
         audioFilename: note.audio_filename || undefined,
         audioDurationSeconds: note.audio_duration_seconds || undefined,
+        audioMimeType: note.audio_mimetype || undefined,
         transcriptionText: note.transcription_text || undefined,
         isTranscriptionEdited: isEdited,
         aiTranscribed: aiTranscribed,
