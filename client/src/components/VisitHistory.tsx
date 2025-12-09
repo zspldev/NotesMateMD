@@ -140,13 +140,23 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
         bytes[i] = binaryString.charCodeAt(i);
       }
       // Use the actual MIME type from the note, falling back to common formats
-      const mimeType = note.audioMimeType || 'audio/webm';
+      const mimeType = note.audioMimeType || 'audio/mp4';
       console.log('Playing audio with MIME type:', mimeType);
       const blob = new Blob([bytes], { type: mimeType });
       const audioUrl = URL.createObjectURL(blob);
       audioUrlRef.current = audioUrl;
 
-      const audio = new Audio(audioUrl);
+      // iOS Safari fix: Use <source> element instead of setting src directly
+      // This fixes blob URL playback issues on iOS 17.4+
+      const audio = document.createElement('audio');
+      audio.setAttribute('playsinline', 'true'); // Required for iOS
+      audio.setAttribute('webkit-playsinline', 'true');
+      
+      const source = document.createElement('source');
+      source.type = mimeType;
+      source.src = audioUrl;
+      audio.appendChild(source);
+      
       audioRef.current = audio;
 
       audio.onended = () => {
@@ -157,7 +167,8 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
         }
       };
 
-      audio.onerror = () => {
+      audio.onerror = (e) => {
+        console.error('Audio error:', e);
         setPlayingNoteId(null);
         if (audioUrlRef.current) {
           URL.revokeObjectURL(audioUrlRef.current);
@@ -165,7 +176,21 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
         }
       };
 
-      await audio.play();
+      // iOS Safari fix: Use loadedmetadata event and load() method
+      audio.addEventListener('loadedmetadata', async () => {
+        try {
+          await audio.play();
+          setPlayingNoteId(noteId);
+        } catch (playError) {
+          console.error('Play error after loadedmetadata:', playError);
+          setPlayingNoteId(null);
+        }
+      });
+
+      // Trigger load
+      audio.load();
+      
+      // Set playing state optimistically for better UX
       setPlayingNoteId(noteId);
     } catch (error) {
       console.error('Error playing audio:', error);

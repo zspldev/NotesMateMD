@@ -96,7 +96,18 @@ export default function AudioRecorder({
   const playAudio = () => {
     if (audioBlob && !isPlaying) {
       const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      const mimeType = audioBlob.type || 'audio/mp4';
+      
+      // iOS Safari fix: Use <source> element instead of setting src directly
+      const audio = document.createElement('audio');
+      audio.setAttribute('playsinline', 'true');
+      audio.setAttribute('webkit-playsinline', 'true');
+      
+      const source = document.createElement('source');
+      source.type = mimeType;
+      source.src = audioUrl;
+      audio.appendChild(source);
+      
       audioRef.current = audio;
       
       audio.onended = () => {
@@ -104,9 +115,25 @@ export default function AudioRecorder({
         URL.revokeObjectURL(audioUrl);
       };
       
-      audio.play();
+      audio.onerror = (e) => {
+        console.error('Audio playback error:', e);
+        setIsPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+      
+      // iOS Safari fix: Use loadedmetadata event
+      audio.addEventListener('loadedmetadata', async () => {
+        try {
+          await audio.play();
+          console.log('Audio playback started with MIME type:', mimeType);
+        } catch (playError) {
+          console.error('Play error:', playError);
+          setIsPlaying(false);
+        }
+      });
+      
+      audio.load();
       setIsPlaying(true);
-      console.log('Audio playback started');
     }
   };
 
@@ -231,7 +258,18 @@ export default function AudioRecorder({
     if (savedAudioBlob && !isPlayingSaved) {
       const audioUrl = URL.createObjectURL(savedAudioBlob);
       savedAudioUrlRef.current = audioUrl;
-      const audio = new Audio(audioUrl);
+      const mimeType = savedAudioBlob.type || existingAudioMimetype || 'audio/mp4';
+      
+      // iOS Safari fix: Use <source> element instead of setting src directly
+      const audio = document.createElement('audio');
+      audio.setAttribute('playsinline', 'true');
+      audio.setAttribute('webkit-playsinline', 'true');
+      
+      const source = document.createElement('source');
+      source.type = mimeType;
+      source.src = audioUrl;
+      audio.appendChild(source);
+      
       savedAudioRef.current = audio;
       
       audio.onended = () => {
@@ -242,9 +280,28 @@ export default function AudioRecorder({
         }
       };
       
-      audio.play();
+      audio.onerror = (e) => {
+        console.error('Saved audio playback error:', e);
+        setIsPlayingSaved(false);
+        if (savedAudioUrlRef.current) {
+          URL.revokeObjectURL(savedAudioUrlRef.current);
+          savedAudioUrlRef.current = null;
+        }
+      };
+      
+      // iOS Safari fix: Use loadedmetadata event
+      audio.addEventListener('loadedmetadata', async () => {
+        try {
+          await audio.play();
+          console.log('Saved audio playback started with MIME type:', mimeType);
+        } catch (playError) {
+          console.error('Saved audio play error:', playError);
+          setIsPlayingSaved(false);
+        }
+      });
+      
+      audio.load();
       setIsPlayingSaved(true);
-      console.log('Saved audio playback started');
     }
   };
 
