@@ -93,47 +93,54 @@ export default function AudioRecorder({
     }
   };
 
-  const playAudio = () => {
+  const playAudio = async () => {
     if (audioBlob && !isPlaying) {
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const mimeType = audioBlob.type || 'audio/mp4';
-      
-      // iOS Safari fix: Use <source> element instead of setting src directly
-      const audio = document.createElement('audio');
-      audio.setAttribute('playsinline', 'true');
-      audio.setAttribute('webkit-playsinline', 'true');
-      
-      const source = document.createElement('source');
-      source.type = mimeType;
-      source.src = audioUrl;
-      audio.appendChild(source);
-      
-      audioRef.current = audio;
-      
-      audio.onended = () => {
-        setIsPlaying(false);
-        URL.revokeObjectURL(audioUrl);
-      };
-      
-      audio.onerror = (e) => {
-        console.error('Audio playback error:', e);
-        setIsPlaying(false);
-        URL.revokeObjectURL(audioUrl);
-      };
-      
-      // iOS Safari fix: Use loadedmetadata event
-      audio.addEventListener('loadedmetadata', async () => {
-        try {
-          await audio.play();
-          console.log('Audio playback started with MIME type:', mimeType);
-        } catch (playError) {
-          console.error('Play error:', playError);
+      try {
+        const mimeType = audioBlob.type || 'audio/mp4';
+        
+        // iOS Safari fix: Convert blob to data URL instead of using blob URL
+        // iOS Safari 17.x has a regression where blob:// URLs don't work for audio playback
+        const reader = new FileReader();
+        
+        reader.onloadend = async () => {
+          try {
+            const dataUrl = reader.result as string;
+            console.log('Playing audio with data URL, MIME type:', mimeType);
+            
+            const audio = new Audio();
+            audio.setAttribute('playsinline', 'true');
+            audio.setAttribute('webkit-playsinline', 'true');
+            audio.src = dataUrl;
+            
+            audioRef.current = audio;
+            
+            audio.onended = () => {
+              setIsPlaying(false);
+            };
+            
+            audio.onerror = (e) => {
+              console.error('Audio playback error:', e);
+              setIsPlaying(false);
+            };
+            
+            await audio.play();
+            setIsPlaying(true);
+          } catch (playError) {
+            console.error('Play error:', playError);
+            setIsPlaying(false);
+          }
+        };
+        
+        reader.onerror = () => {
+          console.error('FileReader error');
           setIsPlaying(false);
-        }
-      });
-      
-      audio.load();
-      setIsPlaying(true);
+        };
+        
+        reader.readAsDataURL(audioBlob);
+      } catch (error) {
+        console.error('Error playing audio:', error);
+        setIsPlaying(false);
+      }
     }
   };
 
@@ -254,54 +261,37 @@ export default function AudioRecorder({
     };
   }, [existingAudioFile, existingAudioMimetype, existingAudioFilename]);
 
-  const playSavedAudio = () => {
-    if (savedAudioBlob && !isPlayingSaved) {
-      const audioUrl = URL.createObjectURL(savedAudioBlob);
-      savedAudioUrlRef.current = audioUrl;
-      const mimeType = savedAudioBlob.type || existingAudioMimetype || 'audio/mp4';
-      
-      // iOS Safari fix: Use <source> element instead of setting src directly
-      const audio = document.createElement('audio');
-      audio.setAttribute('playsinline', 'true');
-      audio.setAttribute('webkit-playsinline', 'true');
-      
-      const source = document.createElement('source');
-      source.type = mimeType;
-      source.src = audioUrl;
-      audio.appendChild(source);
-      
-      savedAudioRef.current = audio;
-      
-      audio.onended = () => {
-        setIsPlayingSaved(false);
-        if (savedAudioUrlRef.current) {
-          URL.revokeObjectURL(savedAudioUrlRef.current);
-          savedAudioUrlRef.current = null;
-        }
-      };
-      
-      audio.onerror = (e) => {
-        console.error('Saved audio playback error:', e);
-        setIsPlayingSaved(false);
-        if (savedAudioUrlRef.current) {
-          URL.revokeObjectURL(savedAudioUrlRef.current);
-          savedAudioUrlRef.current = null;
-        }
-      };
-      
-      // iOS Safari fix: Use loadedmetadata event
-      audio.addEventListener('loadedmetadata', async () => {
-        try {
-          await audio.play();
-          console.log('Saved audio playback started with MIME type:', mimeType);
-        } catch (playError) {
-          console.error('Saved audio play error:', playError);
+  const playSavedAudio = async () => {
+    // iOS Safari fix: Use data URL directly from base64 instead of blob URL
+    // iOS Safari 17.x has a regression where blob:// URLs don't work for audio playback
+    if (existingAudioFile && !isPlayingSaved) {
+      try {
+        const mimeType = existingAudioMimetype || 'audio/mp4';
+        const dataUrl = `data:${mimeType};base64,${existingAudioFile}`;
+        console.log('Playing saved audio with data URL, MIME type:', mimeType);
+        
+        const audio = new Audio();
+        audio.setAttribute('playsinline', 'true');
+        audio.setAttribute('webkit-playsinline', 'true');
+        audio.src = dataUrl;
+        
+        savedAudioRef.current = audio;
+        
+        audio.onended = () => {
           setIsPlayingSaved(false);
-        }
-      });
-      
-      audio.load();
-      setIsPlayingSaved(true);
+        };
+        
+        audio.onerror = (e) => {
+          console.error('Saved audio playback error:', e);
+          setIsPlayingSaved(false);
+        };
+        
+        await audio.play();
+        setIsPlayingSaved(true);
+      } catch (error) {
+        console.error('Error playing saved audio:', error);
+        setIsPlayingSaved(false);
+      }
     }
   };
 
