@@ -115,7 +115,16 @@ Preferred communication style: Simple, everyday language.
   - Files: `server/pdf-service.ts`, `client/src/components/ExportPDFDialog.tsx`
   - API endpoint: `GET /api/patients/:patientid/notes/export?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`
 
+- **iOS Audio Playback Fix**: Resolved critical iOS Safari/Chrome audio playback issue
+  - **Root Cause**: iOS MediaRecorder records audio as MP4/AAC but browser incorrectly reports MIME type as 'audio/wav'
+  - **Solution**: Implemented byte-level audio format detection that inspects file signatures (ftyp for MP4, RIFF for WAV, etc.)
+  - **Result**: Audio now plays correctly on all devices (iPhone, iPad, Android, Desktop)
+  - Files: `client/src/components/AudioRecorder.tsx`, `client/src/components/VisitHistory.tsx`
+  - Key function: `detectAudioFormat()` - inspects first bytes to determine actual format
+  - Additional iOS fixes applied: DOM-appended audio elements, `<source>` tags, `playsinline` attributes
+
 ### Known Technical Considerations
 - **Security Enhancement Opportunity**: Currently, the backend accepts orgid from client request body. Future improvement should derive orgid from authenticated session to prevent potential tampering.
 - **MRN Sequence Management**: The `mrn_sequence` must exist in all deployment environments. Monitor logs for MRN creation errors to catch misconfigured sequences early.
 - **AI Integration**: Uses Replit AI Integrations for OpenAI access (no separate API key required). Charges are billed to Replit credits.
+- **iOS Audio Compatibility**: Uses byte-level format detection because iOS browsers lie about MediaRecorder MIME types. The `detectAudioFormat()` function must be used for all audio playback to ensure cross-platform compatibility.
