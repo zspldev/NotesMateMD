@@ -16,6 +16,9 @@ import NotFound from "@/pages/not-found";
 
 import { api, type LoginResponse } from "./lib/api";
 
+import logoImage from "@assets/NotesMateMD-Logo-New-Image-NoBG_1765432461912.png";
+import logoWordmark from "@assets/NotesMateMD-Logo-New-Words-NoBG_1765432453100.png";
+
 function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -43,10 +46,21 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-3xl font-semibold" style={{ color: '#17a2b8' }}>
-              NotesMate MD
-            </span>
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center justify-center gap-3">
+              <img 
+                src={logoImage} 
+                alt="NotesMate MD Logo" 
+                className="h-16 w-auto object-contain"
+                data-testid="img-logo"
+              />
+              <img 
+                src={logoWordmark} 
+                alt="NotesMate MD" 
+                className="h-12 w-auto object-contain"
+                data-testid="img-wordmark"
+              />
+            </div>
             <p className="text-sm font-medium text-foreground">
               Created by Zapurzaa Systems
             </p>
