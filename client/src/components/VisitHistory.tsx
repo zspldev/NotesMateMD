@@ -92,6 +92,34 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Detect actual audio format from file bytes (browser MIME types are often wrong on iOS)
+  const detectAudioFormat = (bytes: Uint8Array): string => {
+    // Check first bytes for format signatures
+    // MP4/M4A: starts with 'ftyp' at byte 4
+    if (bytes.length > 8 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+      console.log('Detected MP4/M4A format from file bytes');
+      return 'audio/mp4';
+    }
+    // WebM: starts with 0x1A45DFA3
+    if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) {
+      console.log('Detected WebM format from file bytes');
+      return 'audio/webm';
+    }
+    // OGG: starts with 'OggS'
+    if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
+      console.log('Detected OGG format from file bytes');
+      return 'audio/ogg';
+    }
+    // WAV: starts with 'RIFF'
+    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+      console.log('Detected WAV format from file bytes');
+      return 'audio/wav';
+    }
+    // Fallback to mp4 (safest for iOS)
+    console.log('Could not detect format, using fallback: audio/mp4');
+    return 'audio/mp4';
+  };
   
   const formatNoteDateTime = (createdAt: string) => {
     const date = new Date(createdAt);
@@ -140,7 +168,6 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
       // Data URLs have size/memory issues on iOS
       // Blob URLs work when using <source> tag (not .src property)
       const base64Data = note.audioData;
-      const mimeType = note.audioMimeType || 'audio/mp4';
       
       // Decode base64 to binary
       const binaryString = atob(base64Data);
@@ -148,6 +175,14 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
+      
+      // Detect actual MIME type from bytes (stored MIME type may be wrong)
+      const storedMimeType = note.audioMimeType || 'audio/mp4';
+      const detectedMimeType = detectAudioFormat(bytes);
+      console.log('Stored MIME:', storedMimeType, '| Detected MIME:', detectedMimeType);
+      
+      // Use detected MIME type (more reliable than stored)
+      const mimeType = detectedMimeType;
       const blob = new Blob([bytes], { type: mimeType });
       const blobUrl = URL.createObjectURL(blob);
       audioUrlRef.current = blobUrl;

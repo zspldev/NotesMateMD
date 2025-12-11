@@ -45,6 +45,46 @@ export default function AudioRecorder({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const actualMimeTypeRef = useRef<string>('audio/wav');
 
+  // Detect actual audio format from file bytes (browser MIME types are often wrong on iOS)
+  const detectAudioFormat = (blob: Blob): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const arr = new Uint8Array(reader.result as ArrayBuffer);
+        // Check first bytes for format signatures
+        // MP4/M4A: starts with 'ftyp' at byte 4
+        if (arr.length > 8 && arr[4] === 0x66 && arr[5] === 0x74 && arr[6] === 0x79 && arr[7] === 0x70) {
+          console.log('Detected MP4/M4A format from file bytes');
+          resolve('audio/mp4');
+          return;
+        }
+        // WebM: starts with 0x1A45DFA3
+        if (arr[0] === 0x1A && arr[1] === 0x45 && arr[2] === 0xDF && arr[3] === 0xA3) {
+          console.log('Detected WebM format from file bytes');
+          resolve('audio/webm');
+          return;
+        }
+        // OGG: starts with 'OggS'
+        if (arr[0] === 0x4F && arr[1] === 0x67 && arr[2] === 0x67 && arr[3] === 0x53) {
+          console.log('Detected OGG format from file bytes');
+          resolve('audio/ogg');
+          return;
+        }
+        // WAV: starts with 'RIFF'
+        if (arr[0] === 0x52 && arr[1] === 0x49 && arr[2] === 0x46 && arr[3] === 0x46) {
+          console.log('Detected WAV format from file bytes');
+          resolve('audio/wav');
+          return;
+        }
+        // Fallback to blob type or mp4 (safest for iOS)
+        const fallback = blob.type || 'audio/mp4';
+        console.log('Could not detect format, using fallback:', fallback);
+        resolve(fallback);
+      };
+      reader.readAsArrayBuffer(blob.slice(0, 16));
+    });
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -56,11 +96,19 @@ export default function AudioRecorder({
         chunks.push(event.data);
       };
       
-      mediaRecorder.onstop = () => {
-        // Use the actual MIME type supported by MediaRecorder
-        const mimeType = actualMimeTypeRef.current;
-        const blob = new Blob(chunks, { type: mimeType });
-        setAudioBlob(blob);
+      mediaRecorder.onstop = async () => {
+        // First create blob with reported type
+        const reportedType = actualMimeTypeRef.current;
+        const tempBlob = new Blob(chunks, { type: reportedType });
+        
+        // Detect actual format from bytes (iOS often lies about MIME type)
+        const detectedType = await detectAudioFormat(tempBlob);
+        console.log('Reported MIME:', reportedType, '| Detected MIME:', detectedType);
+        
+        // Create final blob with correct type
+        const finalBlob = new Blob(chunks, { type: detectedType });
+        actualMimeTypeRef.current = detectedType;
+        setAudioBlob(finalBlob);
         stream.getTracks().forEach(track => track.stop());
       };
       
@@ -284,14 +332,21 @@ export default function AudioRecorder({
     // Blob URLs work when using <source> tag (not .src property)
     if (existingAudioFile && !isPlayingSaved) {
       try {
-        const mimeType = existingAudioMimetype || 'audio/mp4';
-        
         // Decode base64 to binary
         const binaryString = atob(existingAudioFile);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
         }
+        
+        // Create temp blob to detect actual format
+        const tempBlob = new Blob([bytes]);
+        const detectedMimeType = await detectAudioFormat(tempBlob);
+        const storedMimeType = existingAudioMimetype || 'audio/mp4';
+        console.log('Saved audio - Stored MIME:', storedMimeType, '| Detected MIME:', detectedMimeType);
+        
+        // Use detected MIME type (more reliable than stored)
+        const mimeType = detectedMimeType;
         const blob = new Blob([bytes], { type: mimeType });
         const blobUrl = URL.createObjectURL(blob);
         savedAudioUrlRef.current = blobUrl;
