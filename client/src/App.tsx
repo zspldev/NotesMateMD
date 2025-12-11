@@ -18,6 +18,7 @@ import { api, type LoginResponse } from "./lib/api";
 
 import logoImage from "@assets/NotesMateMD-Logo-New-Image-NoBG_1765432461912.png";
 import logoWordmark from "@assets/NotesMateMD-Logo-New-Words-NoBG_1765432453100.png";
+import zsplLogo from "@assets/ZSPL-Logo-Symbol-Name-NoBG_1765432873353.png";
 
 function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void }) {
   const [username, setUsername] = useState("");
@@ -61,9 +62,17 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
                 data-testid="img-wordmark"
               />
             </div>
-            <p className="text-sm font-medium text-foreground">
-              Created by Zapurzaa Systems
-            </p>
+            <div className="flex flex-col items-center gap-1">
+              <p className="text-sm font-medium text-foreground">
+                Created by
+              </p>
+              <img 
+                src={zsplLogo} 
+                alt="Zapurzaa Systems" 
+                className="h-4 w-auto object-contain"
+                data-testid="img-zspl-logo"
+              />
+            </div>
           </div>
           <div>
             <p className="text-sm text-muted-foreground mt-2">
