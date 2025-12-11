@@ -69,7 +69,7 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
               <img 
                 src={zsplLogo} 
                 alt="Zapurzaa Systems" 
-                className="h-4 w-auto object-contain"
+                className="h-5 w-auto object-contain"
                 data-testid="img-zspl-logo"
               />
             </div>
