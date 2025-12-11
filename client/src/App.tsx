@@ -48,17 +48,17 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
           <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center gap-2 sm:gap-3">
               <img 
                 src={logoImage} 
                 alt="NotesMate MD Logo" 
-                className="h-16 w-auto object-contain"
+                className="h-12 sm:h-16 w-auto object-contain"
                 data-testid="img-logo"
               />
               <img 
                 src={logoWordmark} 
                 alt="NotesMate MD" 
-                className="h-12 w-auto object-contain"
+                className="h-8 sm:h-12 w-auto object-contain"
                 data-testid="img-wordmark"
               />
             </div>
