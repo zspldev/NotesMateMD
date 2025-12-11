@@ -391,10 +391,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const trimmedTranscription = rawTranscription?.trim() || '';
       const hasManualTranscription = trimmedTranscription.length > 0;
       
+      // Capture IP address from request
+      const ipAddress = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() 
+        || req.socket.remoteAddress 
+        || 'unknown';
+      
       const noteData: any = {
         visitid: req.body.visitid,
         transcription_text: hasManualTranscription ? trimmedTranscription : null,
-        is_transcription_edited: hasManualTranscription // Mark as edited if manually provided
+        is_transcription_edited: hasManualTranscription, // Mark as edited if manually provided
+        // Device/Browser tracking fields from client
+        session_id: req.body.session_id || null,
+        device_type: req.body.device_type || null,
+        browser_name: req.body.browser_name || null,
+        ip_address: ipAddress,
+        user_agent: req.body.user_agent || req.headers['user-agent'] || null,
       };
       
       console.log('POST /api/notes received:', {
