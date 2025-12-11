@@ -66,6 +66,12 @@ export const visit_notes = pgTable("visit_notes", {
   transcription_text: text("transcription_text"),
   is_transcription_edited: boolean("is_transcription_edited").default(false),
   ai_transcribed: boolean("ai_transcribed").default(false), // Track if transcription was AI-generated
+  // Device/Browser tracking fields
+  session_id: varchar("session_id", { length: 100 }), // Unique session identifier
+  device_type: varchar("device_type", { length: 20 }), // Mobile, Tablet, Desktop
+  browser_name: varchar("browser_name", { length: 100 }), // Chrome, Safari, Firefox, etc.
+  ip_address: varchar("ip_address", { length: 45 }), // IPv4 or IPv6 address
+  user_agent: text("user_agent"), // Full user agent string
   created_at: timestamp("created_at").default(sql`now()`),
   updated_at: timestamp("updated_at").default(sql`now()`),
 }, (table) => ({
