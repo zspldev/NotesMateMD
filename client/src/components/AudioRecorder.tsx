@@ -105,26 +105,39 @@ export default function AudioRecorder({
         console.log('Playing audio with blob URL via <source> tag, MIME type:', mimeType);
 
         // Create audio element with <source> child (required for iOS)
+        // iOS REQUIRES the audio element to be in the DOM, not just in memory
         const audio = document.createElement('audio');
         audio.setAttribute('playsinline', 'true');
         audio.setAttribute('webkit-playsinline', 'true');
+        audio.style.display = 'none'; // Hide it but keep in DOM
         
         const source = document.createElement('source');
         source.type = mimeType;
         source.src = blobUrl;
         audio.appendChild(source);
         
+        // iOS fix: Append to DOM (required for iOS playback)
+        document.body.appendChild(audio);
+        
         audioRef.current = audio;
         
         audio.onended = () => {
           setIsPlaying(false);
           URL.revokeObjectURL(blobUrl);
+          // Clean up: remove from DOM
+          if (audio.parentNode) {
+            audio.parentNode.removeChild(audio);
+          }
         };
         
         audio.onerror = (e) => {
           console.error('Audio playback error:', e);
           setIsPlaying(false);
           URL.revokeObjectURL(blobUrl);
+          // Clean up: remove from DOM
+          if (audio.parentNode) {
+            audio.parentNode.removeChild(audio);
+          }
         };
         
         // iOS 17.4+ fix: Use loadstart event (canplay/loadedmetadata don't fire reliably)
@@ -286,14 +299,19 @@ export default function AudioRecorder({
         console.log('Playing saved audio with blob URL via <source> tag, MIME type:', mimeType);
 
         // Create audio element with <source> child (required for iOS)
+        // iOS REQUIRES the audio element to be in the DOM, not just in memory
         const audio = document.createElement('audio');
         audio.setAttribute('playsinline', 'true');
         audio.setAttribute('webkit-playsinline', 'true');
+        audio.style.display = 'none'; // Hide it but keep in DOM
         
         const source = document.createElement('source');
         source.type = mimeType;
         source.src = blobUrl;
         audio.appendChild(source);
+        
+        // iOS fix: Append to DOM (required for iOS playback)
+        document.body.appendChild(audio);
         
         savedAudioRef.current = audio;
         
@@ -303,6 +321,10 @@ export default function AudioRecorder({
             URL.revokeObjectURL(savedAudioUrlRef.current);
             savedAudioUrlRef.current = null;
           }
+          // Clean up: remove from DOM
+          if (audio.parentNode) {
+            audio.parentNode.removeChild(audio);
+          }
         };
         
         audio.onerror = (e) => {
@@ -311,6 +333,10 @@ export default function AudioRecorder({
           if (savedAudioUrlRef.current) {
             URL.revokeObjectURL(savedAudioUrlRef.current);
             savedAudioUrlRef.current = null;
+          }
+          // Clean up: remove from DOM
+          if (audio.parentNode) {
+            audio.parentNode.removeChild(audio);
           }
         };
         

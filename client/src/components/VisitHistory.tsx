@@ -117,6 +117,10 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
     // If playing a different note, stop it first
     if (audioRef.current) {
       audioRef.current.pause();
+      // Clean up: remove from DOM
+      if (audioRef.current.parentNode) {
+        audioRef.current.parentNode.removeChild(audioRef.current);
+      }
       audioRef.current = null;
     }
     if (audioUrlRef.current) {
@@ -151,14 +155,19 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
       console.log('Playing audio with blob URL via <source> tag, MIME type:', mimeType);
 
       // Create audio element with <source> child (required for iOS)
+      // iOS REQUIRES the audio element to be in the DOM, not just in memory
       const audio = document.createElement('audio');
       audio.setAttribute('playsinline', 'true');
       audio.setAttribute('webkit-playsinline', 'true');
+      audio.style.display = 'none'; // Hide it but keep in DOM
       
       const source = document.createElement('source');
       source.type = mimeType;
       source.src = blobUrl;
       audio.appendChild(source);
+      
+      // iOS fix: Append to DOM (required for iOS playback)
+      document.body.appendChild(audio);
       
       audioRef.current = audio;
 
@@ -168,6 +177,10 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
           URL.revokeObjectURL(audioUrlRef.current);
           audioUrlRef.current = null;
         }
+        // Clean up: remove from DOM
+        if (audio.parentNode) {
+          audio.parentNode.removeChild(audio);
+        }
       };
 
       audio.onerror = (e) => {
@@ -176,6 +189,10 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
         if (audioUrlRef.current) {
           URL.revokeObjectURL(audioUrlRef.current);
           audioUrlRef.current = null;
+        }
+        // Clean up: remove from DOM
+        if (audio.parentNode) {
+          audio.parentNode.removeChild(audio);
         }
       };
 
