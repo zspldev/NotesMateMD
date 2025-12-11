@@ -98,45 +98,49 @@ export default function AudioRecorder({
       try {
         const mimeType = audioBlob.type || 'audio/mp4';
         
-        // iOS Safari fix: Convert blob to data URL instead of using blob URL
-        // iOS Safari 17.x has a regression where blob:// URLs don't work for audio playback
-        const reader = new FileReader();
+        // iOS fix: Use blob URL with <source> tag
+        // Data URLs have size/memory issues on iOS
+        // Blob URLs work when using <source> tag (not .src property)
+        const blobUrl = URL.createObjectURL(audioBlob);
+        console.log('Playing audio with blob URL via <source> tag, MIME type:', mimeType);
+
+        // Create audio element with <source> child (required for iOS)
+        const audio = document.createElement('audio');
+        audio.setAttribute('playsinline', 'true');
+        audio.setAttribute('webkit-playsinline', 'true');
         
-        reader.onloadend = async () => {
+        const source = document.createElement('source');
+        source.type = mimeType;
+        source.src = blobUrl;
+        audio.appendChild(source);
+        
+        audioRef.current = audio;
+        
+        audio.onended = () => {
+          setIsPlaying(false);
+          URL.revokeObjectURL(blobUrl);
+        };
+        
+        audio.onerror = (e) => {
+          console.error('Audio playback error:', e);
+          setIsPlaying(false);
+          URL.revokeObjectURL(blobUrl);
+        };
+        
+        // iOS 17.4+ fix: Use loadstart event (canplay/loadedmetadata don't fire reliably)
+        audio.addEventListener('loadstart', async () => {
           try {
-            const dataUrl = reader.result as string;
-            console.log('Playing audio with data URL, MIME type:', mimeType);
-            
-            const audio = new Audio();
-            audio.setAttribute('playsinline', 'true');
-            audio.setAttribute('webkit-playsinline', 'true');
-            audio.src = dataUrl;
-            
-            audioRef.current = audio;
-            
-            audio.onended = () => {
-              setIsPlaying(false);
-            };
-            
-            audio.onerror = (e) => {
-              console.error('Audio playback error:', e);
-              setIsPlaying(false);
-            };
-            
             await audio.play();
-            setIsPlaying(true);
+            console.log('Audio playback started');
           } catch (playError) {
             console.error('Play error:', playError);
             setIsPlaying(false);
           }
-        };
+        });
         
-        reader.onerror = () => {
-          console.error('FileReader error');
-          setIsPlaying(false);
-        };
-        
-        reader.readAsDataURL(audioBlob);
+        // Trigger load
+        audio.load();
+        setIsPlaying(true);
       } catch (error) {
         console.error('Error playing audio:', error);
         setIsPlaying(false);
@@ -262,31 +266,67 @@ export default function AudioRecorder({
   }, [existingAudioFile, existingAudioMimetype, existingAudioFilename]);
 
   const playSavedAudio = async () => {
-    // iOS Safari fix: Use data URL directly from base64 instead of blob URL
-    // iOS Safari 17.x has a regression where blob:// URLs don't work for audio playback
+    // iOS fix: Convert base64 to blob, then use blob URL with <source> tag
+    // Data URLs have size/memory issues on iOS
+    // Blob URLs work when using <source> tag (not .src property)
     if (existingAudioFile && !isPlayingSaved) {
       try {
         const mimeType = existingAudioMimetype || 'audio/mp4';
-        const dataUrl = `data:${mimeType};base64,${existingAudioFile}`;
-        console.log('Playing saved audio with data URL, MIME type:', mimeType);
         
-        const audio = new Audio();
+        // Decode base64 to binary
+        const binaryString = atob(existingAudioFile);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: mimeType });
+        const blobUrl = URL.createObjectURL(blob);
+        savedAudioUrlRef.current = blobUrl;
+        
+        console.log('Playing saved audio with blob URL via <source> tag, MIME type:', mimeType);
+
+        // Create audio element with <source> child (required for iOS)
+        const audio = document.createElement('audio');
         audio.setAttribute('playsinline', 'true');
         audio.setAttribute('webkit-playsinline', 'true');
-        audio.src = dataUrl;
+        
+        const source = document.createElement('source');
+        source.type = mimeType;
+        source.src = blobUrl;
+        audio.appendChild(source);
         
         savedAudioRef.current = audio;
         
         audio.onended = () => {
           setIsPlayingSaved(false);
+          if (savedAudioUrlRef.current) {
+            URL.revokeObjectURL(savedAudioUrlRef.current);
+            savedAudioUrlRef.current = null;
+          }
         };
         
         audio.onerror = (e) => {
           console.error('Saved audio playback error:', e);
           setIsPlayingSaved(false);
+          if (savedAudioUrlRef.current) {
+            URL.revokeObjectURL(savedAudioUrlRef.current);
+            savedAudioUrlRef.current = null;
+          }
         };
         
-        await audio.play();
+        // iOS 17.4+ fix: Use loadstart event (canplay/loadedmetadata don't fire reliably)
+        audio.addEventListener('loadstart', async () => {
+          try {
+            await audio.play();
+            console.log('Saved audio playback started');
+          } catch (playError) {
+            console.error('Saved audio play error:', playError);
+            setIsPlayingSaved(false);
+          }
+        });
+        
+        // Trigger load
+        audio.load();
         setIsPlayingSaved(true);
       } catch (error) {
         console.error('Error playing saved audio:', error);

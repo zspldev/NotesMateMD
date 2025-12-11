@@ -119,6 +119,10 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
       audioRef.current.pause();
       audioRef.current = null;
     }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
 
     // Check if note has audio data
     if (!note.audioData) {
@@ -128,32 +132,66 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
     }
 
     try {
-      // iOS Safari fix: Use data URL instead of blob URL
-      // iOS Safari 17.x has a regression where blob:// URLs don't work for audio playback
+      // iOS fix: Convert base64 to blob, then use blob URL with <source> tag
+      // Data URLs have size/memory issues on iOS
+      // Blob URLs work when using <source> tag (not .src property)
       const base64Data = note.audioData;
       const mimeType = note.audioMimeType || 'audio/mp4';
-      const dataUrl = `data:${mimeType};base64,${base64Data}`;
-      console.log('Playing audio with data URL, MIME type:', mimeType);
+      
+      // Decode base64 to binary
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mimeType });
+      const blobUrl = URL.createObjectURL(blob);
+      audioUrlRef.current = blobUrl;
+      
+      console.log('Playing audio with blob URL via <source> tag, MIME type:', mimeType);
 
-      // Create audio element and set src directly to data URL
-      const audio = new Audio();
+      // Create audio element with <source> child (required for iOS)
+      const audio = document.createElement('audio');
       audio.setAttribute('playsinline', 'true');
       audio.setAttribute('webkit-playsinline', 'true');
-      audio.src = dataUrl;
+      
+      const source = document.createElement('source');
+      source.type = mimeType;
+      source.src = blobUrl;
+      audio.appendChild(source);
       
       audioRef.current = audio;
 
       audio.onended = () => {
         setPlayingNoteId(null);
+        if (audioUrlRef.current) {
+          URL.revokeObjectURL(audioUrlRef.current);
+          audioUrlRef.current = null;
+        }
       };
 
       audio.onerror = (e) => {
         console.error('Audio error:', e);
         setPlayingNoteId(null);
+        if (audioUrlRef.current) {
+          URL.revokeObjectURL(audioUrlRef.current);
+          audioUrlRef.current = null;
+        }
       };
 
-      // Play the audio
-      await audio.play();
+      // iOS 17.4+ fix: Use loadstart event (canplay/loadedmetadata don't fire reliably)
+      audio.addEventListener('loadstart', async () => {
+        try {
+          await audio.play();
+          console.log('Audio playback started');
+        } catch (playError) {
+          console.error('Play error:', playError);
+          setPlayingNoteId(null);
+        }
+      });
+
+      // Trigger load
+      audio.load();
       setPlayingNoteId(noteId);
     } catch (error) {
       console.error('Error playing audio:', error);
