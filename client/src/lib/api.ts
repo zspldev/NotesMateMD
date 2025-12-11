@@ -1,5 +1,6 @@
 // API client for NotesMate backend
 import type { InsertPatient } from "@shared/schema";
+import { getDeviceInfo } from './deviceInfo';
 
 export interface LoginCredentials {
   username: string;
@@ -164,9 +165,16 @@ class ApiClient {
     transcription_text?: string;
     is_transcription_edited?: boolean;
   }): Promise<VisitNote> {
+    const deviceInfo = getDeviceInfo();
     return this.request<VisitNote>('/notes', {
       method: 'POST',
-      body: JSON.stringify(note),
+      body: JSON.stringify({
+        ...note,
+        session_id: deviceInfo.sessionId,
+        device_type: deviceInfo.deviceType,
+        browser_name: deviceInfo.browserName,
+        user_agent: deviceInfo.userAgent,
+      }),
     });
   }
 
@@ -198,6 +206,13 @@ class ApiClient {
     if (audioDuration) {
       formData.append('audio_duration_seconds', audioDuration.toString());
     }
+
+    // Add device/browser tracking info
+    const deviceInfo = getDeviceInfo();
+    formData.append('session_id', deviceInfo.sessionId);
+    formData.append('device_type', deviceInfo.deviceType);
+    formData.append('browser_name', deviceInfo.browserName);
+    formData.append('user_agent', deviceInfo.userAgent);
 
     const response = await fetch(`${this.baseUrl}/notes`, {
       method: 'POST',
