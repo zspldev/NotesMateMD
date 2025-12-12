@@ -3,6 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Sun, 
   Moon, 
@@ -75,6 +85,8 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   const [error, setError] = useState<string>("");
   const [isNewPatientDialogOpen, setIsNewPatientDialogOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
 
   const currentUser = {
     firstName: loginData.employee.first_name,
@@ -439,7 +451,13 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
                   </div>
                   <Button 
                     variant="outline" 
-                    onClick={() => setCurrentView('history')}
+                    onClick={() => {
+                      if (hasUnsavedChanges) {
+                        setShowUnsavedDialog(true);
+                      } else {
+                        setCurrentView('history');
+                      }
+                    }}
                     data-testid="button-back-to-history"
                     className="w-full sm:w-auto"
                   >
@@ -458,6 +476,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
               existingAudioDuration={latestSavedNote?.audio_duration_seconds || undefined}
               existingAudioFilename={latestSavedNote?.audio_filename || undefined}
               existingTranscription={latestSavedNote?.transcription_text || undefined}
+              onUnsavedChanges={setHasUnsavedChanges}
             />
           </div>
         );
@@ -572,6 +591,38 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
           patientName={`${selectedPatient.first_name} ${selectedPatient.last_name}`}
         />
       )}
+
+      {/* Unsaved Changes Confirmation Dialog */}
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved transcription or audio that will be lost if you leave this page. 
+              Would you like to save your note before leaving?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => setShowUnsavedDialog(false)}
+              data-testid="button-cancel-leave"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setShowUnsavedDialog(false);
+                setHasUnsavedChanges(false);
+                setCurrentView('history');
+              }}
+              data-testid="button-discard-changes"
+            >
+              Discard Changes
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

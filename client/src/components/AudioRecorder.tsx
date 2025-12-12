@@ -15,6 +15,7 @@ interface AudioRecorderProps {
   existingAudioDuration?: number;
   existingAudioFilename?: string;
   isReadOnly?: boolean;
+  onUnsavedChanges?: (hasUnsaved: boolean) => void;
 }
 
 export default function AudioRecorder({
@@ -26,6 +27,7 @@ export default function AudioRecorder({
   existingAudioDuration,
   existingAudioFilename,
   isReadOnly = false,
+  onUnsavedChanges,
 }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -37,6 +39,15 @@ export default function AudioRecorder({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [transcriptionSource, setTranscriptionSource] = useState<'none' | 'auto' | 'manual'>('none');
+  const [lastSavedTranscription, setLastSavedTranscription] = useState(existingTranscription);
+  const [hasUnsavedAudio, setHasUnsavedAudio] = useState(false);
+
+  // Track unsaved changes and notify parent
+  useEffect(() => {
+    const hasUnsavedText = transcription.trim() !== lastSavedTranscription.trim();
+    const hasUnsaved = hasUnsavedText || hasUnsavedAudio;
+    onUnsavedChanges?.(hasUnsaved);
+  }, [transcription, lastSavedTranscription, hasUnsavedAudio, onUnsavedChanges]);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -109,6 +120,7 @@ export default function AudioRecorder({
         const finalBlob = new Blob(chunks, { type: detectedType });
         actualMimeTypeRef.current = detectedType;
         setAudioBlob(finalBlob);
+        setHasUnsavedAudio(true); // Mark as having unsaved audio
         stream.getTracks().forEach(track => track.stop());
       };
       
@@ -249,6 +261,8 @@ export default function AudioRecorder({
       setIsPlaying(false);
       setTranscription('');
       setTranscriptionSource('none');
+      setLastSavedTranscription(''); // Reset to empty after save
+      setHasUnsavedAudio(false); // Clear unsaved audio flag
     } catch (error) {
       console.error('Failed to save note:', error);
     } finally {
