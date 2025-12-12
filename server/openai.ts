@@ -130,7 +130,7 @@ export const QUICK_INSERT_PHRASES = [
 
 /**
  * Format raw transcription text into a structured medical note template
- * the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+ * Using GPT-4o Mini for cost-effective text formatting
  */
 export async function formatTranscriptionToTemplate(
   rawTranscription: string,
@@ -163,7 +163,7 @@ More content...`;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+      model: "gpt-4o-mini", // Cost-effective model for text formatting tasks
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
