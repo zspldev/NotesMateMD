@@ -123,7 +123,13 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
         isTranscriptionEdited: isEdited,
         aiTranscribed: aiTranscribed,
         createdAt: new Date(note.created_at).toISOString(),
-        audioData: note.audio_file || undefined
+        audioData: note.audio_file || undefined,
+        // Device/Browser tracking fields
+        sessionId: note.session_id || undefined,
+        deviceType: note.device_type || undefined,
+        browserName: note.browser_name || undefined,
+        ipAddress: note.ip_address || undefined,
+        userAgent: note.user_agent || undefined
       };
     }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }), []);

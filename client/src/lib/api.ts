@@ -61,6 +61,12 @@ export interface VisitNote {
   transcription_text: string | null;
   is_transcription_edited: boolean | null;
   ai_transcribed?: boolean;
+  // Device/Browser tracking fields
+  session_id?: string | null;
+  device_type?: string | null;
+  browser_name?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
   created_at: Date;
   updated_at: Date;
 }

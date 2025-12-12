@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, FileText, Play, Pause, User, Bot } from "lucide-react";
+import { Calendar, Clock, FileText, Play, Pause, User, Bot, Monitor, Smartphone, Tablet, Globe } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface VisitNote {
   noteId: string;
@@ -14,6 +15,12 @@ interface VisitNote {
   aiTranscribed?: boolean;
   createdAt: string;
   audioData?: string;
+  // Device/Browser tracking fields
+  sessionId?: string;
+  deviceType?: string;
+  browserName?: string;
+  ipAddress?: string;
+  userAgent?: string;
 }
 
 interface Visit {
@@ -319,6 +326,40 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
                     </>
                   )}
                 </div>
+
+                {/* Device/Browser Tracking Info - Only shows device type and browser (non-sensitive) */}
+                {(note.deviceType || note.browserName) && (
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                    {note.deviceType && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1 cursor-default">
+                            {note.deviceType === 'Mobile' && <Smartphone className="h-3 w-3" />}
+                            {note.deviceType === 'Tablet' && <Tablet className="h-3 w-3" />}
+                            {note.deviceType === 'Desktop' && <Monitor className="h-3 w-3" />}
+                            <span data-testid={`text-device-${note.noteId}`}>{note.deviceType}</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Device used to create this note</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {note.browserName && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1 cursor-default">
+                            <Globe className="h-3 w-3" />
+                            <span data-testid={`text-browser-${note.noteId}`}>{note.browserName}</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Browser used to create this note</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                )}
 
                 {/* Audio Controls */}
                 {note.audioFilename && (

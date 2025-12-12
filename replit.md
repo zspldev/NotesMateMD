@@ -123,6 +123,19 @@ Preferred communication style: Simple, everyday language.
   - Key function: `detectAudioFormat()` - inspects first bytes to determine actual format
   - Additional iOS fixes applied: DOM-appended audio elements, `<source>` tags, `playsinline` attributes
 
+- **Device/Browser Tracking for Visit Notes**: Implemented audit trail tracking for note creation
+  - **Database Schema**: Added new columns to visit_notes: `session_id`, `device_type`, `browser_name`, `ip_address`, `user_agent`
+  - **Browser Detection**: Created `client/src/lib/deviceInfo.ts` utility that detects device type (Mobile/Tablet/Desktop), browser name+version, and generates session IDs stored in sessionStorage
+  - **IP Address Capture**: Server extracts IP from `x-forwarded-for` header or socket remote address
+  - **UI Display**: Shows device type icon (smartphone/tablet/monitor) and browser name in visit history (HIPAA-compliant: IP address and session ID stored but NOT displayed in UI to avoid PHI/PII exposure)
+  - **Audit Purpose**: Tracking data stored in database for compliance auditing but only non-sensitive fields shown to clinical users
+  - Files: `client/src/lib/deviceInfo.ts`, `server/routes.ts`, `client/src/components/VisitHistory.tsx`
+
+- **Logo Branding Update**: Updated opening/login screen
+  - Replaced text title with horizontal logo image + wordmark
+  - Added "Created by" text with Zapurzaa Systems logo image
+  - Responsive sizing for mobile devices
+
 ### Known Technical Considerations
 - **Security Enhancement Opportunity**: Currently, the backend accepts orgid from client request body. Future improvement should derive orgid from authenticated session to prevent potential tampering.
 - **MRN Sequence Management**: The `mrn_sequence` must exist in all deployment environments. Monitor logs for MRN creation errors to catch misconfigured sequences early.
