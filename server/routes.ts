@@ -259,6 +259,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Switch organization (for super admin impersonation)
+  app.post("/api/auth/switch-org", async (req, res) => {
+    try {
+      // Get token from Authorization header
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "No authorization token provided" });
+      }
+      
+      const token = authHeader.substring(7);
+      const authContext = verifyAccessToken(token);
+      
+      if (!authContext) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+      
+      // Only super_admin can switch orgs
+      if (authContext.role !== 'super_admin') {
+        return res.status(403).json({ error: "Only super admins can switch organizations" });
+      }
+      
+      const { org_number } = req.body;
+      
+      // Get target org
+      const targetOrg = await storage.getOrgByOrgNumber(parseInt(org_number, 10));
+      if (!targetOrg) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      if (targetOrg.is_active === false) {
+        return res.status(403).json({ error: "Organization is not active" });
+      }
+      
+      // Get the employee info
+      const employee = await storage.getEmployee(authContext.empid);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+      
+      // Create new token with impersonated org context
+      const newToken = createAccessToken({
+        empid: authContext.empid,
+        orgid: authContext.orgid, // Keep original orgid
+        role: authContext.role,
+        impersonatedOrgId: targetOrg.orgid
+      });
+      
+      const { password_hash, ...employeeData } = employee;
+      
+      console.log(`Super admin ${employee.username} switched to org ${targetOrg.org_name} (${org_number})`);
+      
+      res.json({
+        employee: employeeData,
+        organization: targetOrg,
+        accessToken: newToken
+      });
+    } catch (error) {
+      console.error('Switch org error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Clear impersonation (return to super admin home view)
+  app.post("/api/auth/clear-impersonation", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "No authorization token provided" });
+      }
+      
+      const token = authHeader.substring(7);
+      const authContext = verifyAccessToken(token);
+      
+      if (!authContext) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+      
+      if (authContext.role !== 'super_admin') {
+        return res.status(403).json({ error: "Only super admins can clear impersonation" });
+      }
+      
+      // Get the employee info
+      const employee = await storage.getEmployee(authContext.empid);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+      
+      // Create token without impersonation
+      const newToken = createAccessToken({
+        empid: authContext.empid,
+        orgid: authContext.orgid,
+        role: authContext.role
+        // No impersonatedOrgId
+      });
+      
+      const { password_hash, ...employeeData } = employee;
+      
+      console.log(`Super admin ${employee.username} cleared impersonation`);
+      
+      res.json({
+        employee: employeeData,
+        organization: null,
+        accessToken: newToken
+      });
+    } catch (error) {
+      console.error('Clear impersonation error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Organization routes
   app.get("/api/organizations", async (req, res) => {
     try {

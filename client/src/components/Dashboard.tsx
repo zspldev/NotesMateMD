@@ -23,7 +23,9 @@ import {
   LogOut,
   ArrowLeft,
   Loader2,
-  Download
+  Download,
+  X,
+  Shield
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import PatientSelector from "./PatientSelector";
@@ -31,6 +33,7 @@ import VisitHistory from "./VisitHistory";
 import AudioRecorder from "./AudioRecorder";
 import NewPatientDialog from "./NewPatientDialog";
 import ExportPDFDialog from "./ExportPDFDialog";
+import SuperAdminDashboard from "./SuperAdminDashboard";
 import { useToast } from "@/hooks/use-toast";
 import { api, type LoginResponse, type Patient, type Visit } from "../lib/api";
 import type { InsertPatient } from "@shared/schema";
@@ -38,6 +41,8 @@ import type { InsertPatient } from "@shared/schema";
 interface DashboardProps {
   loginData: LoginResponse;
   onLogout: () => void;
+  onSwitchOrg?: (orgCode: string) => void;
+  onClearImpersonation?: () => void;
 }
 
 // UI types that match existing component prop expectations
@@ -72,7 +77,7 @@ interface UINote {
   audioData?: string;
 }
 
-export default function Dashboard({ loginData, onLogout }: DashboardProps) {
+export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImpersonation }: DashboardProps) {
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -92,7 +97,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     firstName: loginData.employee.first_name,
     lastName: loginData.employee.last_name,
     title: loginData.employee.title || 'Unknown',
-    orgName: loginData.organization?.org_name || 'Unknown Organization',
+    orgName: loginData.organization?.org_name || 'Zapurzaa Systems',
     role: loginData.employee.role
   };
 
@@ -101,6 +106,13 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   
   // Role-based permission helpers
   const isSuperAdmin = loginData.employee.role === 'super_admin';
+  
+  // Check if super admin is in their home org (ZSPL) without clinical context
+  const isSuperAdminWithoutOrgContext = isSuperAdmin && !loginData.organization;
+  
+  // Check if super admin is impersonating an org (has org context)
+  const isImpersonating = isSuperAdmin && loginData.organization !== null;
+  
   const isOrgAdmin = loginData.employee.role === 'org_admin';
   const isDoctor = loginData.employee.role === 'doctor';
   const isStaff = loginData.employee.role === 'staff';
@@ -388,6 +400,16 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
       );
     }
 
+    // Super admin without org context sees admin dashboard
+    if (isSuperAdminWithoutOrgContext && currentView === 'select') {
+      return (
+        <SuperAdminDashboard 
+          loginData={loginData} 
+          onSwitchOrg={onSwitchOrg || (() => {})} 
+        />
+      );
+    }
+
     switch (currentView) {
       case 'select':
         return (
@@ -511,6 +533,33 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Impersonation Banner */}
+      {isImpersonating && (
+        <div 
+          className="bg-amber-500 text-white px-4 py-2"
+          data-testid="banner-impersonation"
+        >
+          <div className="container mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                Super Admin Mode: Viewing {loginData.organization?.org_name}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-amber-600"
+              onClick={onClearImpersonation}
+              data-testid="button-exit-impersonation"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Exit
+            </Button>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-3">

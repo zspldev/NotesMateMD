@@ -142,6 +142,44 @@ class ApiClient {
     return response;
   }
 
+  // Switch organization (for super admin impersonation)
+  async switchOrg(orgNumber: string): Promise<LoginResponse> {
+    const response = await this.request<LoginResponse>('/auth/switch-org', {
+      method: 'POST',
+      body: JSON.stringify({ org_number: orgNumber }),
+    });
+    
+    // Update the access token
+    if (response.accessToken) {
+      this.setAccessToken(response.accessToken);
+    }
+    
+    return response;
+  }
+
+  // Clear impersonation (return to super admin home view)
+  async clearImpersonation(): Promise<LoginResponse> {
+    const response = await this.request<LoginResponse>('/auth/clear-impersonation', {
+      method: 'POST',
+    });
+    
+    // Update the access token
+    if (response.accessToken) {
+      this.setAccessToken(response.accessToken);
+    }
+    
+    return response;
+  }
+
+  // Set token externally (for logout)
+  setToken(token: string | null): void {
+    if (token) {
+      this.setAccessToken(token);
+    } else {
+      this.clearAccessToken();
+    }
+  }
+
   // Patients
   async getPatients(orgid: string, search?: string): Promise<Patient[]> {
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';

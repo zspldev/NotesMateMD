@@ -178,7 +178,32 @@ function App() {
 
   const handleLogout = () => {
     setLoginData(null);
+    api.setToken(null);
     console.log('User logged out');
+  };
+
+  const handleSwitchOrg = async (orgCode: string) => {
+    if (!loginData) return;
+    
+    try {
+      const newLoginData = await api.switchOrg(orgCode);
+      setLoginData(newLoginData);
+      console.log(`Switched to org ${orgCode}`);
+    } catch (error) {
+      console.error('Failed to switch org:', error);
+    }
+  };
+
+  const handleClearImpersonation = async () => {
+    if (!loginData) return;
+    
+    try {
+      const newLoginData = await api.clearImpersonation();
+      setLoginData(newLoginData);
+      console.log('Cleared impersonation, returning to admin view');
+    } catch (error) {
+      console.error('Failed to clear impersonation:', error);
+    }
   };
 
   return (
@@ -187,7 +212,12 @@ function App() {
         <ThemeProvider defaultTheme="light">
           <Toaster />
           {loginData ? (
-            <Dashboard loginData={loginData} onLogout={handleLogout} />
+            <Dashboard 
+              loginData={loginData} 
+              onLogout={handleLogout} 
+              onSwitchOrg={handleSwitchOrg}
+              onClearImpersonation={handleClearImpersonation}
+            />
           ) : (
             <LoginPage onLogin={handleLogin} />
           )}
