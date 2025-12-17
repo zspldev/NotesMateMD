@@ -226,6 +226,16 @@ class ApiClient {
     });
   }
 
+  async getPlatformStats(): Promise<{
+    totalPatients: number;
+    totalEmployees: number;
+    totalVisits: number;
+    activeOrgs: number;
+    inactiveOrgs: number;
+  }> {
+    return this.request('/platform-stats');
+  }
+
   // Patients
   async getPatients(orgid: string, search?: string): Promise<Patient[]> {
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';

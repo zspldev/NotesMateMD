@@ -427,6 +427,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get platform stats (super admin only)
+  app.get("/api/platform-stats", requireAuth(), async (req, res) => {
+    try {
+      const authContext = req.authContext!;
+      
+      if (authContext.role !== 'super_admin') {
+        return res.status(403).json({ error: "Only super admins can access platform stats" });
+      }
+      
+      const stats = await storage.getPlatformStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Get platform stats error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Create organization (super admin only)
   app.post("/api/organizations", requireAuth(), async (req, res) => {
     try {

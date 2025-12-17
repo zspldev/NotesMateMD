@@ -5,13 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import {
   Building2,
   Users,
-  Settings,
-  Shield,
+  UserRound,
+  ClipboardList,
   LogIn,
   RefreshCw,
   Loader2,
   Plus,
-  Pencil
+  Pencil,
+  Shield
 } from "lucide-react";
 import { api, type LoginResponse } from "../lib/api";
 import AddOrganizationDialog from "./AddOrganizationDialog";
@@ -31,8 +32,17 @@ interface Organization {
   is_active: boolean | null;
 }
 
+interface PlatformStats {
+  totalPatients: number;
+  totalEmployees: number;
+  totalVisits: number;
+  activeOrgs: number;
+  inactiveOrgs: number;
+}
+
 export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdminDashboardProps) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [stats, setStats] = useState<PlatformStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -40,18 +50,22 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
 
   useEffect(() => {
-    loadOrganizations();
+    loadData();
   }, []);
 
-  const loadOrganizations = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     setError("");
     try {
-      const orgs = await api.getOrganizations();
+      const [orgs, platformStats] = await Promise.all([
+        api.getOrganizations(),
+        api.getPlatformStats()
+      ]);
       setOrganizations(orgs.filter((org: Organization) => org.org_number !== 1001));
+      setStats(platformStats);
     } catch (err) {
-      console.error('Failed to load organizations:', err);
-      setError('Failed to load organizations. Please try again.');
+      console.error('Failed to load data:', err);
+      setError('Failed to load data. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -93,42 +107,63 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
         </CardHeader>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="hover-elevate cursor-pointer">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="hover-elevate">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
             <CardTitle className="text-sm font-medium">Organizations</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{organizations.length}</div>
+            <div className="text-2xl font-bold" data-testid="stat-orgs">
+              {stats?.activeOrgs ?? organizations.length}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Active medical organizations
+              {stats?.inactiveOrgs ? `${stats.inactiveOrgs} inactive` : 'Active organizations'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="hover-elevate cursor-pointer">
+        <Card className="hover-elevate">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium">Your Role</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Super Admin</div>
+            <div className="text-2xl font-bold" data-testid="stat-employees">
+              {stats?.totalEmployees ?? '-'}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Full platform access
+              Across all organizations
             </p>
           </CardContent>
         </Card>
 
-        <Card className="hover-elevate cursor-pointer">
+        <Card className="hover-elevate">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium">System Org</CardTitle>
-            <Settings className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+            <UserRound className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">ZSPL</div>
+            <div className="text-2xl font-bold" data-testid="stat-patients">
+              {stats?.totalPatients ?? '-'}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Zapurzaa Systems
+              Registered in system
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover-elevate">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium">Total Visits</CardTitle>
+            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="stat-visits">
+              {stats?.totalVisits ?? '-'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Patient encounters
             </p>
           </CardContent>
         </Card>
@@ -150,7 +185,7 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
               <Button 
                 variant="outline" 
                 size="icon"
-                onClick={loadOrganizations}
+                onClick={loadData}
                 disabled={isLoading}
                 data-testid="button-refresh-orgs"
               >
@@ -262,14 +297,14 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
       <AddOrganizationDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        onSuccess={loadOrganizations}
+        onSuccess={loadData}
       />
 
       <EditOrganizationDialog
         open={showEditDialog}
         onOpenChange={setShowEditDialog}
         organization={selectedOrg}
-        onSuccess={loadOrganizations}
+        onSuccess={loadData}
       />
     </div>
   );

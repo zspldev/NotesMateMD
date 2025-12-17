@@ -57,6 +57,15 @@ export interface IStorage {
       employee: Employee;
     }>;
   } | null>;
+  
+  // Platform stats (super admin)
+  getPlatformStats(): Promise<{
+    totalPatients: number;
+    totalEmployees: number;
+    totalVisits: number;
+    activeOrgs: number;
+    inactiveOrgs: number;
+  }>;
 }
 
 export class MemStorage implements IStorage {
@@ -510,6 +519,23 @@ export class MemStorage implements IStorage {
     
     return { patient, org, notes: notesWithContext };
   }
+
+  async getPlatformStats(): Promise<{
+    totalPatients: number;
+    totalEmployees: number;
+    totalVisits: number;
+    activeOrgs: number;
+    inactiveOrgs: number;
+  }> {
+    const allOrgs = Array.from(this.orgs.values());
+    const activeOrgs = allOrgs.filter(o => o.is_active && o.org_number !== 1001).length;
+    const inactiveOrgs = allOrgs.filter(o => !o.is_active && o.org_number !== 1001).length;
+    const totalEmployees = Array.from(this.employees.values()).filter(e => e.role !== 'super_admin').length;
+    const totalPatients = this.patients.size;
+    const totalVisits = this.visits.size;
+    
+    return { totalPatients, totalEmployees, totalVisits, activeOrgs, inactiveOrgs };
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -746,6 +772,41 @@ export class DatabaseStorage implements IStorage {
     );
     
     return { patient, org, notes: notesWithContext };
+  }
+
+  async getPlatformStats(): Promise<{
+    totalPatients: number;
+    totalEmployees: number;
+    totalVisits: number;
+    activeOrgs: number;
+    inactiveOrgs: number;
+  }> {
+    // Count patients
+    const patientResult = await db.select({ count: sql<number>`count(*)` }).from(patients);
+    const totalPatients = patientResult[0]?.count || 0;
+    
+    // Count non-super-admin employees
+    const employeeResult = await db.select({ count: sql<number>`count(*)` })
+      .from(employees)
+      .where(sql`${employees.role} != 'super_admin'`);
+    const totalEmployees = employeeResult[0]?.count || 0;
+    
+    // Count visits
+    const visitResult = await db.select({ count: sql<number>`count(*)` }).from(visits);
+    const totalVisits = visitResult[0]?.count || 0;
+    
+    // Count active/inactive orgs (excluding system org 1001)
+    const activeResult = await db.select({ count: sql<number>`count(*)` })
+      .from(orgs)
+      .where(and(eq(orgs.is_active, true), sql`${orgs.org_number} != 1001`));
+    const activeOrgs = activeResult[0]?.count || 0;
+    
+    const inactiveResult = await db.select({ count: sql<number>`count(*)` })
+      .from(orgs)
+      .where(and(eq(orgs.is_active, false), sql`${orgs.org_number} != 1001`));
+    const inactiveOrgs = inactiveResult[0]?.count || 0;
+    
+    return { totalPatients, totalEmployees, totalVisits, activeOrgs, inactiveOrgs };
   }
 }
 
