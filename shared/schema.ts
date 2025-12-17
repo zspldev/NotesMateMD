@@ -31,6 +31,7 @@ export const employees = pgTable("employees", {
   last_name: varchar("last_name", { length: 100 }).notNull(),
   title: varchar("title", { length: 100 }), // Doctor, Nurse, PA, Receptionist, etc.
   role: varchar("role", { length: 20 }).default("doctor"), // super_admin, org_admin, doctor, staff
+  secondary_role: varchar("secondary_role", { length: 20 }), // Optional second role for dual-role users
   is_active: boolean("is_active").default(true),
   created_at: timestamp("created_at").default(sql`now()`),
 }, (table) => ({

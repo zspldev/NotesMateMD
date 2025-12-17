@@ -17,6 +17,7 @@ export interface LoginResponse {
     last_name: string;
     title: string | null;
     role: string | null;
+    secondary_role?: string | null;
     is_active: boolean | null;
     created_at: Date;
   };
@@ -31,6 +32,7 @@ export interface LoginResponse {
     created_at: Date;
   } | null;
   accessToken: string;
+  activeRole?: string;
 }
 
 export interface Patient {
@@ -161,6 +163,21 @@ class ApiClient {
   async clearImpersonation(): Promise<LoginResponse> {
     const response = await this.request<LoginResponse>('/auth/clear-impersonation', {
       method: 'POST',
+    });
+    
+    // Update the access token
+    if (response.accessToken) {
+      this.setAccessToken(response.accessToken);
+    }
+    
+    return response;
+  }
+
+  // Switch role for dual-role users (org_admin/doctor)
+  async switchRole(targetRole: string): Promise<LoginResponse> {
+    const response = await this.request<LoginResponse>('/auth/switch-role', {
+      method: 'POST',
+      body: JSON.stringify({ target_role: targetRole }),
     });
     
     // Update the access token

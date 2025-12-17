@@ -127,6 +127,7 @@ export class MemStorage implements IStorage {
       last_name: "Smith",
       title: "Primary Care Physician",
       role: "doctor",
+      secondary_role: null,
       is_active: true,
       created_at: new Date()
     };
@@ -141,6 +142,7 @@ export class MemStorage implements IStorage {
       last_name: "Wilson",
       title: "Cardiologist",
       role: "doctor",
+      secondary_role: null,
       is_active: true,
       created_at: new Date()
     };
@@ -328,6 +330,7 @@ export class MemStorage implements IStorage {
       orgid: insertEmployee.orgid ?? null,
       title: insertEmployee.title || null,
       role: insertEmployee.role ?? 'doctor',
+      secondary_role: insertEmployee.secondary_role ?? null,
       is_active: insertEmployee.is_active ?? true,
       created_at: new Date() 
     };

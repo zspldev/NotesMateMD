@@ -7,6 +7,8 @@ export interface AuthContext {
   empid: string;
   orgid: string | null;
   role: string;
+  secondaryRole?: string | null;
+  activeRole: string; // The currently active role for dual-role users
   impersonatedOrgId?: string;
   exp: number;
 }

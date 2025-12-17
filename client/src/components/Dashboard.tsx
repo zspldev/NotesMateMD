@@ -34,6 +34,7 @@ import AudioRecorder from "./AudioRecorder";
 import NewPatientDialog from "./NewPatientDialog";
 import ExportPDFDialog from "./ExportPDFDialog";
 import SuperAdminDashboard from "./SuperAdminDashboard";
+import OrgAdminDashboard from "./OrgAdminDashboard";
 import { useToast } from "@/hooks/use-toast";
 import { api, type LoginResponse, type Patient, type Visit } from "../lib/api";
 import type { InsertPatient } from "@shared/schema";
@@ -43,6 +44,8 @@ interface DashboardProps {
   onLogout: () => void;
   onSwitchOrg?: (orgCode: string) => void;
   onClearImpersonation?: () => void;
+  activeRole?: string;
+  onSwitchRole?: (role: string) => void;
 }
 
 // UI types that match existing component prop expectations
@@ -77,7 +80,7 @@ interface UINote {
   audioData?: string;
 }
 
-export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImpersonation }: DashboardProps) {
+export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImpersonation, activeRole, onSwitchRole }: DashboardProps) {
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -116,6 +119,13 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
   const isOrgAdmin = loginData.employee.role === 'org_admin';
   const isDoctor = loginData.employee.role === 'doctor';
   const isStaff = loginData.employee.role === 'staff';
+  
+  // Determine the current active role (from prop or default based on primary role)
+  const currentActiveRole = activeRole || (isOrgAdmin ? 'org_admin' : loginData.employee.role);
+  
+  // Check if user is in admin view vs clinical view
+  const isInAdminView = currentActiveRole === 'org_admin';
+  const hasSecondaryRole = !!loginData.employee.secondary_role;
   
   // Permission checks
   const canManagePatients = isSuperAdmin || isOrgAdmin || isDoctor;
@@ -406,6 +416,16 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
         <SuperAdminDashboard 
           loginData={loginData} 
           onSwitchOrg={onSwitchOrg || (() => {})} 
+        />
+      );
+    }
+    
+    // Org admin in admin view sees org admin dashboard
+    if (isOrgAdmin && isInAdminView && currentView === 'select') {
+      return (
+        <OrgAdminDashboard 
+          loginData={loginData} 
+          onSwitchRole={onSwitchRole}
         />
       );
     }

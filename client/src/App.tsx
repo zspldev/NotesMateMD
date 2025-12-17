@@ -171,13 +171,19 @@ function Router() {
 
 function App() {
   const [loginData, setLoginData] = useState<LoginResponse | null>(null);
+  const [activeRole, setActiveRole] = useState<string | null>(null);
 
   const handleLogin = (data: LoginResponse) => {
     setLoginData(data);
+    // Set the initial active role based on login response
+    const defaultActiveRole = data.activeRole || 
+      (data.employee.role === 'org_admin' ? 'org_admin' : data.employee.role);
+    setActiveRole(defaultActiveRole || null);
   };
 
   const handleLogout = () => {
     setLoginData(null);
+    setActiveRole(null);
     api.setToken(null);
     console.log('User logged out');
   };
@@ -206,6 +212,19 @@ function App() {
     }
   };
 
+  const handleSwitchRole = async (targetRole: string) => {
+    if (!loginData) return;
+    
+    try {
+      const newLoginData = await api.switchRole(targetRole);
+      setLoginData(newLoginData);
+      setActiveRole(targetRole);
+      console.log(`Switched to role ${targetRole}`);
+    } catch (error) {
+      console.error('Failed to switch role:', error);
+    }
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -217,6 +236,8 @@ function App() {
               onLogout={handleLogout} 
               onSwitchOrg={handleSwitchOrg}
               onClearImpersonation={handleClearImpersonation}
+              activeRole={activeRole || undefined}
+              onSwitchRole={handleSwitchRole}
             />
           ) : (
             <LoginPage onLogin={handleLogin} />

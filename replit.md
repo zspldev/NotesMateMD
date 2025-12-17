@@ -36,10 +36,12 @@ Preferred communication style: Simple, everyday language.
 - **Password Security**: bcrypt hashing
 - **Access Control**: Organization-based multi-tenancy with employee role-based access (super_admin, org_admin, doctor, staff)
 - **Session Persistence**: Secure HTTP-only cookies
-- **Token-Based Auth**: HMAC-signed access tokens for API authorization (24-hour expiration) with role and organization info.
+- **Token-Based Auth**: HMAC-signed access tokens for API authorization (24-hour expiration) with role, secondaryRole, activeRole, and organization info.
 - **Login Flow**: Requires organization code for regular users; super admins can bypass.
 - **Super Admin Console**: Dashboard for managing organizations and impersonating organization contexts.
 - **Organization Management**: Super admins can create, edit, and deactivate organizations with first admin account setup.
+- **Dual-Role Support**: Employees can have a `secondary_role` (e.g., org_admin with doctor secondary). Role switching via `/api/auth/switch-role` endpoint allows toggling between admin and clinical views.
+- **Role-Based Dashboards**: Super admins see SuperAdminDashboard, org_admins see OrgAdminDashboard, doctors/staff see clinical PatientSelector.
 
 ### Key Features
 - **Medical Editor**: Supports SOAP Note, H&P, Progress Note, Procedure Note templates.

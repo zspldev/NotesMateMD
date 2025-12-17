@@ -201,6 +201,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           empid: employee.empid,
           orgid: employee.orgid,
           role: employee.role || 'doctor',
+          secondaryRole: employee.secondary_role,
+          activeRole: employee.role || 'super_admin',
           impersonatedOrgId: org?.orgid
         });
         
@@ -237,10 +239,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create access token for regular user
+      // Default activeRole: org_admin goes to admin view, others go to clinical
+      const defaultActiveRole = employee.role === 'org_admin' ? 'org_admin' : (employee.role || 'doctor');
       const accessToken = createAccessToken({
         empid: employee.empid,
         orgid: employee.orgid,
-        role: employee.role || 'doctor'
+        role: employee.role || 'doctor',
+        secondaryRole: employee.secondary_role,
+        activeRole: defaultActiveRole
       });
 
       // Return employee info without password hash
@@ -303,6 +309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         empid: authContext.empid,
         orgid: authContext.orgid, // Keep original orgid
         role: authContext.role,
+        secondaryRole: authContext.secondaryRole,
+        activeRole: authContext.activeRole,
         impersonatedOrgId: targetOrg.orgid
       });
       
@@ -350,7 +358,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newToken = createAccessToken({
         empid: authContext.empid,
         orgid: authContext.orgid,
-        role: authContext.role
+        role: authContext.role,
+        secondaryRole: authContext.secondaryRole,
+        activeRole: authContext.activeRole
         // No impersonatedOrgId
       });
       
@@ -365,6 +375,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Clear impersonation error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Switch role for dual-role users (e.g., org_admin with secondary_role=doctor)
+  app.post("/api/auth/switch-role", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "No authorization token provided" });
+      }
+      
+      const token = authHeader.substring(7);
+      const authContext = verifyAccessToken(token);
+      
+      if (!authContext) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+      
+      const { target_role } = req.body;
+      if (!target_role) {
+        return res.status(400).json({ error: "Target role is required" });
+      }
+      
+      // Validate user can switch to target role
+      const validRoles = [authContext.role, authContext.secondaryRole].filter(Boolean);
+      if (!validRoles.includes(target_role)) {
+        return res.status(403).json({ error: "You cannot switch to this role" });
+      }
+      
+      // Get employee info
+      const employee = await storage.getEmployee(authContext.empid);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+      
+      // Create new token with updated activeRole
+      const newToken = createAccessToken({
+        empid: authContext.empid,
+        orgid: authContext.orgid,
+        role: authContext.role,
+        secondaryRole: authContext.secondaryRole,
+        activeRole: target_role,
+        impersonatedOrgId: authContext.impersonatedOrgId
+      });
+      
+      const { password_hash, ...employeeData } = employee;
+      
+      // Get organization info if applicable
+      let org = null;
+      if (employee.orgid) {
+        org = await storage.getOrg(employee.orgid);
+      }
+      
+      console.log(`Employee ${employee.username} switched to role ${target_role}`);
+      
+      res.json({
+        employee: employeeData,
+        organization: org,
+        accessToken: newToken,
+        activeRole: target_role
+      });
+    } catch (error) {
+      console.error('Switch role error:', error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

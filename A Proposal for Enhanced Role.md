@@ -9,6 +9,7 @@
 | Billing Role | Not needed - removed from scope |
 | Impersonation | Required - Super admins can login as any user |
 | Org Admin Count | Multiple org admins allowed per organization |
+| **Dual Roles** | **Option A: Role switching within single account** |
 
 ## Additional Requirements
 
@@ -19,554 +20,326 @@
 | Login with Org ID | All users specify Org ID at login (5-digit, starting at 1001) |
 | MRN per Org | Each org has separate MRN sequence (6-digit numeric only, starting at 100001) |
 | Org Shortname | Each org has unique 6-char alphanumeric shortname |
+| **Org Backup** | **Org admins can export full organization data backup** |
 
 ---
 
-## Role Hierarchy (Updated)
+## Role Clarity & Differentiation
+
+### Key Principle
+**Administrative roles and clinical roles are SEPARATE concerns.**
+
+An org_admin is NOT automatically a doctor. They manage the organization but cannot see patient charts or record notes by default.
+
+If someone needs BOTH administrative AND clinical access, they get a **dual role** with the ability to switch between views.
+
+---
+
+## Role Definitions & Permissions
+
+### 1. Super Admin (Platform Level)
+- **Purpose**: Manage the entire NotesMate platform
+- **Home Screen**: Super Admin Console
+- **Can do**:
+  - Create/edit/deactivate organizations
+  - View platform-wide statistics
+  - Impersonate into any organization
+  - View all organizations and their stats
+- **Cannot do**: Clinical work (no patients, visits, notes)
+
+### 2. Org Admin (Organization Administrative)
+- **Purpose**: Manage their organization's operations and team
+- **Home Screen**: Organization Admin Dashboard (NOT clinical dashboard)
+- **Can do**:
+  - Manage employees (add/edit/deactivate doctors, staff)
+  - Edit organization profile (name, address, phone)
+  - View organization statistics (patient counts, visit counts, employee counts)
+  - View audit logs / compliance reports
+  - Export organization data backup
+  - Reset employee passwords
+- **Cannot do**: Clinical work by default (no patient charts, no recording notes)
+- **Exception**: If also has doctor role, can switch to clinical view
+
+### 3. Doctor (Clinical Role)
+- **Purpose**: Provide patient care and documentation
+- **Home Screen**: Clinical Dashboard (patients/visits/notes)
+- **Can do**:
+  - View/add/edit patients
+  - Create visits
+  - Record audio notes, transcribe, edit notes
+  - Export patient records (PDF)
+  - View all patients in their organization
+- **Cannot do**: Manage employees, org settings, or org-level exports
+
+### 4. Staff (Support Role)
+- **Purpose**: Administrative support for clinical operations
+- **Home Screen**: Limited Clinical Dashboard
+- **Can do**:
+  - View patients (basic info: name, DOB, contact)
+  - Create/schedule visits
+  - View visit list (but not note contents)
+- **Cannot do**: Record notes, view clinical notes, manage employees, org settings
+
+---
+
+## Dual Role System (Option A: Role Switching)
+
+### When Someone Needs Both Roles
+
+A practice owner or manager who is ALSO a practicing physician needs:
+- **Org Admin role**: To manage employees and org settings
+- **Doctor role**: To see patients and record notes
+
+### Implementation
+
+1. **Database**: Employee record stores multiple roles
+   ```
+   roles: ["org_admin", "doctor"]  // Array of roles
+   ```
+
+2. **Login**: User authenticates normally
+
+3. **After Login**: 
+   - System checks if user has multiple roles
+   - If single role: Go directly to appropriate dashboard
+   - If multiple roles: Show role selector OR default to primary role
+
+4. **Role Switching UI**:
+   - Header shows current active role: "Admin View" or "Clinical View"
+   - Toggle/dropdown to switch between available roles
+   - Example: "Switch to Clinical View" / "Switch to Admin View"
+
+5. **Audit Trail**:
+   - All actions logged with active role at time of action
+   - Clear record of which "hat" user was wearing
+
+### Role Switching Flow
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        SUPER ADMIN                              │
-│              (Zapurzaa Systems team)                            │
-│                                                                 │
-│   Can: See all orgs, create orgs, manage org admins,           │
-│        view system analytics, impersonate any user              │
-│   Login: No Org ID required (special case)                      │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        ▼                   ▼                   ▼
-┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-│  ORG A (1001) │   │  ORG B (1002) │   │  ORG C (1003) │
-│  SHORT: CITYH │   │  SHORT: OAKCLC│   │  SHORT: SMTPRC│
-└───────┬───────┘   └───────┬───────┘   └───────┬───────┘
-        │                   │                   │
-        ▼                   ▼                   ▼
-┌───────────────────────────────────────────────────────────────┐
-│                        ORG ADMIN                              │
-│              (Can have multiple per org)                      │
-│                                                               │
-│   Can: Manage employees in their org, view all patients,      │
-│        manage org settings, view org reports                  │
-└───────────────────────────┬───────────────────────────────────┘
-                            │
-                ┌───────────┴───────────┐
-                ▼                       ▼
-        ┌───────────────┐       ┌───────────────┐
-        │    DOCTOR     │       │    STAFF      │
-        │               │       │               │
-        │ Doctors,      │       │ Front desk,   │
-        │ Nurses, PAs   │       │ Assistants    │
-        │               │       │               │
-        │ Full clinical │       │ Basic patient │
-        │ access to ALL │       │ info only     │
-        │ org patients  │       │ (no notes)    │
-        └───────────────┘       └───────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  NotesMate MD           [Dr. Vinita] Admin View ▼  [Logout] │
+│                         ┌────────────────────────┐          │
+│                         │ ✓ Admin View           │          │
+│                         │   Clinical View        │          │
+│                         └────────────────────────┘          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Organization Admin Dashboard                               │
+│  (Employee management, org settings, reports)               │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+         ↓ Clicks "Clinical View" ↓
+
+┌─────────────────────────────────────────────────────────────┐
+│  NotesMate MD        [Dr. Vinita] Clinical View ▼  [Logout] │
+│                         ┌────────────────────────┐          │
+│                         │   Admin View           │          │
+│                         │ ✓ Clinical View        │          │
+│                         └────────────────────────┘          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Clinical Dashboard                                         │
+│  (Patients, visits, notes, recordings)                      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Role Permissions Matrix (Updated)
+## Updated Role Permissions Matrix
 
 | Permission | Super Admin | Org Admin | Doctor | Staff |
 |------------|:-----------:|:---------:|:------:|:-----:|
 | **System Level** |
 | View all organizations | ✓ | - | - | - |
 | Create/edit organizations | ✓ | - | - | - |
-| View system analytics | ✓ | - | - | - |
-| Impersonate any user | ✓ | - | - | - |
+| View platform analytics | ✓ | - | - | - |
+| Impersonate into org | ✓ | - | - | - |
 | **Organization Level** |
 | Manage employees | ✓ | ✓ | - | - |
 | Change org settings | ✓ | ✓ | - | - |
-| View org reports | ✓ | ✓ | - | - |
-| Export org data | ✓ | ✓ | - | - |
+| View org reports/stats | ✓ | ✓ | - | - |
+| Export org backup | ✓ | ✓ | - | - |
 | **Patient Level** |
-| Create patients | ✓ | ✓ | ✓ | ✓ |
-| View all org patients | ✓ | ✓ | ✓ | ✓ (basic info only) |
-| Edit patients | ✓ | ✓ | ✓ | - |
-| Delete patients | ✓ | ✓ | - | - |
+| Create patients | - | - | ✓ | ✓ |
+| View patient list | - | - | ✓ | ✓ (basic info) |
+| Edit patient details | - | - | ✓ | - |
+| Delete patients | - | - | ✓ | - |
 | **Clinical Level** |
-| Create visits | ✓ | ✓ | ✓ | ✓ |
-| Record/transcribe notes | ✓ | ✓ | ✓ | - |
-| View clinical notes | ✓ | ✓ | ✓ | - |
-| Edit notes | ✓ | ✓ | ✓ | - |
-| Export PDF | ✓ | ✓ | ✓ | - |
+| Create visits | - | - | ✓ | ✓ |
+| Record/transcribe notes | - | - | ✓ | - |
+| View clinical notes | - | - | ✓ | - |
+| Edit notes | - | - | ✓ | - |
+| Export patient PDF | - | - | ✓ | - |
 
-**Key Change**: All doctors in an org can see ALL patients in that org and add notes. Patients belong to the organization, not individual doctors.
+**Note**: Org Admin CANNOT do clinical work unless they ALSO have the Doctor role (dual role).
 
 ---
 
-## Database Schema Changes (Updated)
+## Organization Backup Feature
 
-### Organizations Table (Modified)
+### Purpose
+Allow org admins to export a complete backup of their organization's data for:
+- Compliance/record-keeping
+- Migration to another system
+- Disaster recovery
+- Legal/audit requirements
 
-```typescript
-export const orgs = pgTable("orgs", {
-  orgid: uuid("orgid").primaryKey().default(sql`gen_random_uuid()`),
-  org_number: integer("org_number").notNull().unique(), // 5-digit, starts at 1001
-  org_shortname: varchar("org_shortname", { length: 6 }).notNull().unique(), // 6-char alphanumeric
-  org_name: varchar("org_name", { length: 255 }).notNull(),
-  org_type: varchar("org_type", { length: 50 }), // hospital, clinic, medical_office
-  address: text("address"),
-  phone: varchar("phone", { length: 20 }),
-  mrn_sequence_current: integer("mrn_sequence_current").default(100001), // 6-digit MRN, starts at 100001
-  is_active: boolean("is_active").default(true),
-  created_at: timestamp("created_at").default(sql`now()`),
-});
+### What's Included in Backup
+
+1. **Organization Info**
+   - Org name, type, address, phone
+   - Settings and configuration
+
+2. **Employee List**
+   - Names, titles, roles (no passwords)
+   - Active/inactive status
+
+3. **Patient Records**
+   - Demographics
+   - MRN assignments
+
+4. **Visit History**
+   - All visits with dates, purposes
+   - Provider assignments
+
+5. **Clinical Notes**
+   - All transcriptions
+   - Edit history
+   - Timestamps
+   - (Audio files optional - large)
+
+### Backup Format Options
+- **JSON**: Complete structured data
+- **CSV**: Spreadsheet-compatible tables
+- **ZIP**: All files bundled together
+
+### Security Considerations
+- Backup contains PHI - must be encrypted
+- Audit log entry when backup is created
+- Consider password-protecting the download
+- Rate limit backup requests (e.g., 1 per day)
+
+### Backup UI (Org Admin Dashboard)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Organization Settings                                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Data Backup                                                │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Export your organization's data for backup or       │   │
+│  │ compliance purposes.                                 │   │
+│  │                                                      │   │
+│  │ Include:                                             │   │
+│  │ [✓] Patient Records                                  │   │
+│  │ [✓] Visit History                                    │   │
+│  │ [✓] Clinical Notes                                   │   │
+│  │ [ ] Audio Files (large download)                     │   │
+│  │                                                      │   │
+│  │ Format: [JSON ▼]                                     │   │
+│  │                                                      │   │
+│  │ [ Download Backup ]                                  │   │
+│  │                                                      │   │
+│  │ Last backup: December 15, 2024 at 3:42 PM           │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**New Fields:**
-- `org_number`: 5-digit identifier for login (1001, 1002, 1003...)
-- `org_shortname`: 6-character unique alphanumeric code (e.g., "CITYH1", "OAKCLC")
-- `mrn_sequence_current`: Tracks current MRN number for this org (each org starts at 100001)
-- `is_active`: For deactivating orgs without deleting
+---
 
-### Employees Table (Modified)
+## Database Schema Updates
+
+### Employees Table (Updated for Dual Roles)
 
 ```typescript
 export const employees = pgTable("employees", {
   empid: uuid("empid").primaryKey().default(sql`gen_random_uuid()`),
-  orgid: uuid("orgid").references(() => orgs.orgid), // NULL for super_admin only
+  orgid: uuid("orgid").references(() => orgs.orgid),
   username: varchar("username", { length: 100 }).notNull().unique(),
   password_hash: text("password_hash").notNull(),
   first_name: varchar("first_name", { length: 100 }).notNull(),
   last_name: varchar("last_name", { length: 100 }).notNull(),
-  title: varchar("title", { length: 100 }), // Doctor, Nurse, PA, Receptionist, etc.
-  role: varchar("role", { length: 20 }).notNull().default("doctor"), 
-  // Values: super_admin, org_admin, doctor, staff
+  title: varchar("title", { length: 100 }),
+  
+  // UPDATED: Support multiple roles
+  role: varchar("role", { length: 20 }).notNull().default("doctor"), // Primary role
+  secondary_role: varchar("secondary_role", { length: 20 }), // Optional second role
+  
   is_active: boolean("is_active").default(true),
   created_at: timestamp("created_at").default(sql`now()`),
 });
 ```
 
-**Role Values:**
-- `super_admin` - Zapurzaa Systems team (belongs to system org: "Zapurzaa Systems" / ZSPL)
-- `org_admin` - Organization administrators (can have multiple per org)
-- `doctor` - Clinical staff (doctors, nurses, PAs) with full patient access
-- `staff` - Non-clinical staff (front desk, assistants) with basic patient info only
-
-**System Organization (Super Admin):**
-- Org Name: **Zapurzaa Systems**
-- Org Shortname: **ZSPL**
-- Org Number: **1001** (first org in the system)
-- This org is reserved for super admins only
-
-### Patients Table (Modified)
-
+**Alternative**: Use array for roles
 ```typescript
-export const patients = pgTable("patients", {
-  patientid: varchar("patientid", { length: 50 }).primaryKey(), // MRN: 6-digit numeric (100001, 100002...)
-  orgid: uuid("orgid").references(() => orgs.orgid).notNull(),
-  // ... rest unchanged
-});
-```
-
-**MRN Format**: 6-digit numeric only (no org prefix)
-- Each org has its own sequence starting at 100001
-- Example for Org A: 100001, 100002, 100003...
-- Example for Org B: 100001, 100002, 100003... (same numbers, different org)
-- MRN is unique within an org, but not globally unique
-- Patient lookup requires both orgid + MRN
-
----
-
-## Login Flow (Updated)
-
-### Standard User Login (Doctor, Staff, Org Admin)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    NotesMate MD Login                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   Organization ID                                           │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │ 1001                                                │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                                                             │
-│   Username                                                  │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │ dr.smith                                            │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                                                             │
-│   Password                                                  │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │ ••••••••                                            │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                                                             │
-│   [ ] Remember Org ID                                       │
-│                                                             │
-│              ┌─────────────────────┐                       │
-│              │       Login         │                       │
-│              └─────────────────────┘                       │
-│                                                             │
-│   Super Admin? Login without Org ID                        │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Super Admin Login
-
-- Same page, but Org ID field is left empty (or shows "N/A")
-- Backend recognizes super_admin role and bypasses org check
-- Link/toggle: "Super Admin? Login without Org ID"
-
-### After Login Redirect
-
-| Role | Redirect To |
-|------|-------------|
-| Super Admin | Super Admin Dashboard (all orgs view) |
-| Org Admin | Org Dashboard with Team tab visible |
-| Doctor | Org Dashboard (patient list) |
-| Staff | Org Dashboard (limited patient view) |
-
----
-
-## Super Admin Impersonation Feature
-
-### How It Works
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Super Admin Dashboard                                      │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Organizations                                              │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ #    │ Short  │ Name           │ Employees │ Action │   │
-│  ├──────┼────────┼────────────────┼───────────┼────────┤   │
-│  │ 1001 │ CITYH1 │ City Hospital  │    12     │ View ▼ │   │
-│  │      │        │                │           │        │   │
-│  │      │        │ ┌────────────────────────┐ │        │   │
-│  │      │        │ │ View Org Details       │ │        │   │
-│  │      │        │ │ View Employees         │ │        │   │
-│  │      │        │ │ ─────────────────────  │ │        │   │
-│  │      │        │ │ Login as Dr. Smith     │ │        │   │
-│  │      │        │ │ Login as Jane Nurse    │ │        │   │
-│  │      │        │ │ Login as Admin John    │ │        │   │
-│  │      │        │ └────────────────────────┘ │        │   │
-│  └──────┴────────┴────────────────────────────┴────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Impersonation Session
-
-When super admin impersonates a user:
-1. Session stores `impersonated_by: super_admin_empid`
-2. Banner appears at top: "You are logged in as Dr. Smith (City Hospital) - [Return to Super Admin]"
-3. All actions are logged with impersonation flag
-4. Super admin sees exactly what that user sees
-5. Click "Return to Super Admin" to exit impersonation
-
----
-
-## UI Changes Required (Updated)
-
-### 1. Login Screen (Modified)
-- Add "Organization ID" field (5-digit number)
-- Add "Remember Org ID" checkbox
-- Add "Super Admin? Login without Org ID" link/toggle
-- Validate org_number exists before attempting login
-
-### 2. Super Admin Dashboard (New)
-```
-┌─────────────────────────────────────────────────────────────┐
-│  NotesMate MD - Super Admin                       [Logout]  │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Quick Stats                                                │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │ 3 Orgs   │ │ 18 Users │ │ 615 Pts  │ │ 2.1k Notes│      │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
-│                                                             │
-│  Organizations                          [+ Add Organization]│
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ ID   │ Short  │ Name           │ Type    │ Users   │   │
-│  ├──────┼────────┼────────────────┼─────────┼─────────┤   │
-│  │ 1001 │ CITYH1 │ City Hospital  │ Hospital│   12    │   │
-│  │ 1002 │ OAKCLC │ Oak Clinic     │ Clinic  │    4    │   │
-│  │ 1003 │ SMTPRC │ Smith Practice │ Office  │    2    │   │
-│  └──────┴────────┴────────────────┴─────────┴─────────┘   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 3. Add Organization Dialog (New - Super Admin)
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Add New Organization                                    X  │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   Organization ID (auto-generated)                          │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │ 1004                                    (read-only) │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                                                             │
-│   Short Name (6 characters, alphanumeric, unique) *         │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │ NEWORG                                              │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                                                             │
-│   Organization Name *                                       │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │ New Medical Center                                  │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                                                             │
-│   Type                                                      │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │ Hospital ▼                                          │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                                                             │
-│   ── First Org Admin ──                                     │
-│                                                             │
-│   Admin Username *          Admin First Name *              │
-│   ┌─────────────────────┐  ┌─────────────────────┐         │
-│   │ admin.neworg        │  │ John                │         │
-│   └─────────────────────┘  └─────────────────────┘         │
-│                                                             │
-│   Admin Last Name *         Temporary Password *            │
-│   ┌─────────────────────┐  ┌─────────────────────┐         │
-│   │ Administrator       │  │ ••••••••           │         │
-│   └─────────────────────┘  └─────────────────────┘         │
-│                                                             │
-│              ┌─────────┐  ┌─────────────────┐              │
-│              │ Cancel  │  │ Create Org      │              │
-│              └─────────┘  └─────────────────┘              │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 4. Team Management (Org Admin) (New)
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Team Members                             [+ Add Employee]  │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ Name         │ Username  │ Title   │ Role     │ Act │   │
-│  ├──────────────┼───────────┼─────────┼──────────┼─────┤   │
-│  │ Dr. Smith    │ dr.smith  │ Doctor  │ Doctor   │ ✏️  │   │
-│  │ Jane Doe     │ jane.doe  │ Nurse   │ Doctor   │ ✏️  │   │
-│  │ John Admin   │ john.adm  │ Manager │ Org Admin│ ✏️  │   │
-│  │ Mary Front   │ mary.f    │ Recept. │ Staff    │ ✏️  │   │
-│  │ Bob Inactive │ bob.i     │ Doctor  │ Doctor   │ 🔴  │   │
-│  └──────────────┴───────────┴─────────┴──────────┴─────┘   │
-│                                                             │
-│  🔴 = Inactive/Deactivated                                  │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 5. Add/Edit Employee Dialog (Org Admin) (New)
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Add New Employee                                        X  │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   Username *                                                │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │ new.employee                                        │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                                                             │
-│   First Name *              Last Name *                     │
-│   ┌─────────────────────┐  ┌─────────────────────┐         │
-│   │ New                 │  │ Employee            │         │
-│   └─────────────────────┘  └─────────────────────┘         │
-│                                                             │
-│   Title                     Role *                          │
-│   ┌─────────────────────┐  ┌─────────────────────┐         │
-│   │ Physician           │  │ Doctor ▼            │         │
-│   └─────────────────────┘  │ ┌─────────────────┐ │         │
-│                            │ │ Org Admin       │ │         │
-│   Temporary Password *     │ │ Doctor          │ │         │
-│   ┌─────────────────────┐  │ │ Staff           │ │         │
-│   │ ••••••••           │  │ └─────────────────┘ │         │
-│   └─────────────────────┘  └─────────────────────┘         │
-│                                                             │
-│              ┌─────────┐  ┌─────────────────┐              │
-│              │ Cancel  │  │ Add Employee    │              │
-│              └─────────┘  └─────────────────┘              │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 6. Modified Dashboard (Patient View)
-- **For Doctors**: Full access to ALL patients in org, can create visits and notes
-- **For Staff**: Can see patient list (name, DOB, MRN) but cannot view clinical notes
-- **For Org Admin**: Same as Doctor + "Team" tab in navigation
-
-### 7. Navigation Updates
-
-**Super Admin Sidebar:**
-```
-├── Dashboard (org overview)
-├── Organizations
-│   ├── All Organizations
-│   └── Add New
-├── System Reports
-└── My Account
-```
-
-**Org Admin Sidebar:**
-```
-├── Dashboard (patients)
-├── Team Members
-├── Org Settings
-└── My Account
-```
-
-**Doctor Sidebar:**
-```
-├── Dashboard (patients)
-└── My Account
-```
-
-**Staff Sidebar:**
-```
-├── Dashboard (patients - limited view)
-└── My Account
+roles: text("roles").array().notNull().default(["doctor"]),
 ```
 
 ---
 
-## MRN Generation Logic (Updated)
+## Post-Login Flow (Updated)
 
-### Per-Organization MRN Sequence
-
-```typescript
-// When creating a new patient in Org A (orgid = "abc-123"):
-1. Get org.mrn_sequence_current (e.g., 100001)
-2. Generate MRN: "100001" (6-digit numeric only)
-3. Increment org.mrn_sequence_current to 100002
-4. Save patient with patientid = "100001", orgid = "abc-123"
-
-// Next patient in same org:
-MRN = "100002"
-
-// Patient in different org B (orgid = "def-456"):
-MRN = "100001" (each org has its own sequence, same numbers allowed)
 ```
-
-### Database Sequence Management
-
-```sql
--- Each org tracks its own MRN counter in the org record
--- No global sequence needed
-
--- When creating patient:
-UPDATE orgs 
-SET mrn_sequence_current = mrn_sequence_current + 1 
-WHERE orgid = :orgid
-RETURNING mrn_sequence_current - 1 as new_mrn_number;
-
--- Result: patientid = new_mrn_number (6-digit string)
+User logs in
+    │
+    ▼
+Check user roles
+    │
+    ├── Single role only ──────────────────────────────┐
+    │                                                   │
+    │   super_admin → Super Admin Console              │
+    │   org_admin   → Org Admin Dashboard              │
+    │   doctor      → Clinical Dashboard               │
+    │   staff       → Limited Clinical Dashboard       │
+    │                                                   │
+    ├── Multiple roles (e.g., org_admin + doctor) ─────┤
+    │                                                   │
+    │   Default to primary role (org_admin)            │
+    │   Show role switcher in header                   │
+    │   User can toggle to secondary role              │
+    │                                                   │
+    └───────────────────────────────────────────────────┘
 ```
-
-### Primary Key Consideration
-
-Since MRN is no longer globally unique (same MRN can exist in different orgs), we have two options:
-
-**Option A: Composite Primary Key**
-```typescript
-export const patients = pgTable("patients", {
-  mrn: varchar("mrn", { length: 10 }).notNull(), // 6-digit numeric string
-  orgid: uuid("orgid").references(() => orgs.orgid).notNull(),
-  // ... other fields
-}, (table) => ({
-  pk: primaryKey({ columns: [table.orgid, table.mrn] }), // Composite PK
-}));
-```
-
-**Option B: Separate UUID Primary Key** ✅ SELECTED
-```typescript
-export const patients = pgTable("patients", {
-  patientid: uuid("patientid").primaryKey().default(sql`gen_random_uuid()`),
-  mrn: varchar("mrn", { length: 10 }).notNull(), // 6-digit numeric string
-  orgid: uuid("orgid").references(() => orgs.orgid).notNull(),
-  // ... other fields
-}, (table) => ({
-  uniqueMrnPerOrg: unique().on(table.orgid, table.mrn), // Unique constraint
-}));
-```
-
-**Decision**: Option B selected - Keeps a simple UUID primary key for foreign key references while ensuring MRN is unique within each org.
 
 ---
 
-## Implementation Phases (Updated)
+## Implementation Phases
 
-### Phase 1: Database & Backend (Foundation) - 4-5 hours
-1. Modify `orgs` table: add org_number, org_shortname, mrn_sequence_current, is_active
-2. Modify `employees` table: add role, is_active columns
-3. Create database migration
-4. Create org_number sequence (starting at 1001)
-5. Update authentication to include role in session
-6. Add role-checking middleware for API routes
-7. Create super admin account
+### Phase A: Role Separation
+1. Create Org Admin Dashboard (separate from Clinical Dashboard)
+2. Update post-login routing based on role
+3. Remove clinical features from org_admin permissions
 
-### Phase 2: Login Flow Update - 2-3 hours
-1. Add Org ID field to login form
-2. Validate org_number on login
-3. Super admin bypass (no org ID required)
-4. "Remember Org ID" functionality
-5. Role-based redirect after login
+### Phase B: Dual Role Support
+1. Add secondary_role field to employees table
+2. Implement role switcher UI in header
+3. Update session/token to track active role
+4. Route to appropriate dashboard based on active role
 
-### Phase 3: Super Admin UI - 4-5 hours
-1. Create Super Admin Dashboard page
-2. Organization list with stats
-3. Add Organization dialog with first admin creation
-4. Edit/Deactivate organization
-5. Impersonation feature ("Login as" user)
-6. Return from impersonation
+### Phase C: Org Backup Feature
+1. Create backup API endpoint
+2. Build backup UI in Org Admin Dashboard
+3. Implement JSON/CSV export logic
+4. Add audit logging for backup actions
 
-### Phase 4: Org Admin UI - 3-4 hours
-1. Create Team Management page
-2. Add Employee dialog
-3. Edit Employee dialog
-4. Activate/Deactivate employees
-5. Role assignment
-
-### Phase 5: Role-Based Access Control - 2-3 hours
-1. Hide/show UI elements based on role
-2. Protect API routes by role
-3. Staff: hide clinical notes, show basic patient info only
-4. Doctor: full access to all org patients
-5. Impersonation banner and session handling
-
-### Phase 6: MRN Update - 1-2 hours
-1. Update MRN generation to use org_shortname + sequence
-2. Update patient creation flow
-3. Migrate existing patients (if any) to new format
-
----
-
-## Estimated Total Effort
-
-| Phase | Estimated Time |
-|-------|----------------|
-| Phase 1: Database & Backend | 4-5 hours |
-| Phase 2: Login Flow Update | 2-3 hours |
-| Phase 3: Super Admin UI | 4-5 hours |
-| Phase 4: Org Admin UI | 3-4 hours |
-| Phase 5: Role-Based Access Control | 2-3 hours |
-| Phase 6: MRN Update | 1-2 hours |
-| **Total** | **16-22 hours** |
+### Phase D: Employee Management
+1. Create employee list view for org admins
+2. Add/Edit employee dialogs
+3. Password reset functionality
+4. Deactivate/reactivate employees
 
 ---
 
 ## Summary of Key Changes
 
-1. **Roles**: super_admin, org_admin, doctor, staff (no billing role)
-2. **Login**: Requires 5-digit Org ID (except super admin)
-3. **Org ID**: Auto-generated, starts at 1001
-4. **Org Shortname**: User-defined, 6-char alphanumeric, unique
-5. **MRN Format**: 6-digit numeric only (e.g., 100001, 100002) - unique per org, not globally
-6. **Patient Access**: All doctors in org see ALL patients (org-based, not doctor-based)
-7. **Multiple Org Admins**: Allowed per organization
-8. **Impersonation**: Super admins can login as any user
-9. **System Org**: Zapurzaa Systems (ZSPL) - Org #1001, reserved for super admins
-
----
-
-*Document updated: December 17, 2025*
-*Status: Awaiting Final Review*
+| Before | After |
+|--------|-------|
+| Org admin sees clinical dashboard | Org admin sees admin dashboard only |
+| Single role per user | Support for dual roles with switching |
+| No org data export | Full org backup feature for admins |
+| Admin can record notes | Admin cannot record notes (unless also doctor) |
+| Role determines single view | Active role determines current view |
