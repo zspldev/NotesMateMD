@@ -223,6 +223,7 @@ class ApiClient {
     admin_password?: string;
     admin_first_name?: string;
     admin_last_name?: string;
+    admin_has_clinical_access?: boolean;
   }): Promise<{ organization: any; admin: any | null }> {
     return this.request('/organizations', {
       method: 'POST',

@@ -17,10 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { api } from "../lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, User, Loader2 } from "lucide-react";
+import { Building2, User, Loader2, Stethoscope } from "lucide-react";
 
 interface AddOrganizationDialogProps {
   open: boolean;
@@ -47,6 +48,7 @@ export default function AddOrganizationDialog({
   const [adminPassword, setAdminPassword] = useState("");
   const [adminFirstName, setAdminFirstName] = useState("");
   const [adminLastName, setAdminLastName] = useState("");
+  const [adminHasClinicalAccess, setAdminHasClinicalAccess] = useState(true);
 
   useEffect(() => {
     if (open) {
@@ -74,6 +76,7 @@ export default function AddOrganizationDialog({
     setAdminPassword("");
     setAdminFirstName("");
     setAdminLastName("");
+    setAdminHasClinicalAccess(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,6 +123,7 @@ export default function AddOrganizationDialog({
         admin_password: adminPassword || undefined,
         admin_first_name: adminFirstName || undefined,
         admin_last_name: adminLastName || undefined,
+        admin_has_clinical_access: adminHasClinicalAccess,
       });
 
       toast({
@@ -286,6 +290,24 @@ export default function AddOrganizationDialog({
                   onChange={(e) => setAdminPassword(e.target.value)}
                   data-testid="input-admin-password"
                 />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox
+                id="admin-clinical-access"
+                checked={adminHasClinicalAccess}
+                onCheckedChange={(checked) => setAdminHasClinicalAccess(checked === true)}
+                data-testid="checkbox-admin-clinical-access"
+              />
+              <div className="flex items-center gap-1.5">
+                <Stethoscope className="h-4 w-4 text-muted-foreground" />
+                <Label 
+                  htmlFor="admin-clinical-access" 
+                  className="text-sm cursor-pointer"
+                >
+                  Also has clinical access (can see patients and notes)
+                </Label>
               </div>
             </div>
           </div>

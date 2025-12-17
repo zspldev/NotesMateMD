@@ -679,6 +679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If admin credentials provided, create the first org admin
       let firstAdmin = null;
       if (hasAdminInfo) {
+        const { admin_has_clinical_access } = req.body;
         const passwordHash = await bcrypt.hash(admin_password, 10);
         firstAdmin = await storage.createEmployee({
           orgid: newOrg.orgid,
@@ -688,6 +689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           last_name: admin_last_name,
           title: 'Organization Administrator',
           role: 'org_admin',
+          secondary_role: admin_has_clinical_access ? 'doctor' : null,
           is_active: true
         });
         
