@@ -92,6 +92,24 @@ export const visit_notes = pgTable("visit_notes", {
   visitidIdx: index("visit_notes_visitid_idx").on(table.visitid),
 }));
 
+// Backup logs table - tracks all org data exports
+export const backup_logs = pgTable("backup_logs", {
+  backup_id: uuid("backup_id").primaryKey().default(sql`gen_random_uuid()`),
+  orgid: uuid("orgid").references(() => orgs.orgid).notNull(),
+  created_by_empid: uuid("created_by_empid").references(() => employees.empid).notNull(),
+  backup_type: varchar("backup_type", { length: 50 }).default("full_export"), // full_export, patients_only, notes_only
+  file_size_bytes: integer("file_size_bytes"),
+  patient_count: integer("patient_count"),
+  visit_count: integer("visit_count"),
+  note_count: integer("note_count"),
+  status: varchar("status", { length: 20 }).default("completed"), // completed, failed
+  error_message: text("error_message"),
+  created_at: timestamp("created_at").default(sql`now()`),
+}, (table) => ({
+  orgidIdx: index("backup_logs_orgid_idx").on(table.orgid),
+  createdByIdx: index("backup_logs_created_by_idx").on(table.created_by_empid),
+}));
+
 // Insert schemas
 export const insertOrgSchema = createInsertSchema(orgs).omit({
   orgid: true,
@@ -126,6 +144,11 @@ export const insertVisitNoteSchema = createInsertSchema(visit_notes).omit({
   updated_at: true,
 } as const);
 
+export const insertBackupLogSchema = createInsertSchema(backup_logs).omit({
+  backup_id: true,
+  created_at: true,
+});
+
 // Types
 export type InsertOrg = z.infer<typeof insertOrgSchema>;
 export type Org = typeof orgs.$inferSelect;
@@ -142,6 +165,9 @@ export type Visit = typeof visits.$inferSelect;
 
 export type InsertVisitNote = z.infer<typeof insertVisitNoteSchema>;
 export type VisitNote = typeof visit_notes.$inferSelect;
+
+export type InsertBackupLog = z.infer<typeof insertBackupLogSchema>;
+export type BackupLog = typeof backup_logs.$inferSelect;
 
 // Legacy user schema for compatibility
 export const users = pgTable("users", {

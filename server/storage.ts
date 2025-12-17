@@ -4,7 +4,8 @@ import {
   type Patient, type InsertPatient, type InsertPatientWithMRN,
   type Visit, type InsertVisit,
   type VisitNote, type InsertVisitNote,
-  orgs, employees, patients, visits, visit_notes
+  type BackupLog, type InsertBackupLog,
+  orgs, employees, patients, visits, visit_notes, backup_logs
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
@@ -66,6 +67,18 @@ export interface IStorage {
     activeOrgs: number;
     inactiveOrgs: number;
   }>;
+  
+  // Backup log operations
+  createBackupLog(log: InsertBackupLog): Promise<BackupLog>;
+  getBackupLogs(orgid?: string): Promise<BackupLog[]>;
+  
+  // Full org data export
+  getOrgExportData(orgid: string): Promise<{
+    organization: Org;
+    patients: Patient[];
+    visits: Visit[];
+    notes: VisitNote[];
+  } | null>;
 }
 
 export class MemStorage implements IStorage {
@@ -539,6 +552,57 @@ export class MemStorage implements IStorage {
     
     return { totalPatients, totalEmployees, totalVisits, activeOrgs, inactiveOrgs };
   }
+  
+  // Backup log operations (MemStorage - simplified)
+  private backupLogs: Map<string, BackupLog> = new Map();
+  
+  async createBackupLog(log: InsertBackupLog): Promise<BackupLog> {
+    const backup_id = randomUUID();
+    const backupLog: BackupLog = {
+      ...log,
+      backup_id,
+      backup_type: log.backup_type || 'full_export',
+      status: log.status || 'completed',
+      file_size_bytes: log.file_size_bytes ?? null,
+      patient_count: log.patient_count ?? null,
+      visit_count: log.visit_count ?? null,
+      note_count: log.note_count ?? null,
+      error_message: log.error_message ?? null,
+      created_at: new Date()
+    };
+    this.backupLogs.set(backup_id, backupLog);
+    return backupLog;
+  }
+  
+  async getBackupLogs(orgid?: string): Promise<BackupLog[]> {
+    const logs = Array.from(this.backupLogs.values());
+    if (orgid) {
+      return logs.filter(l => l.orgid === orgid).sort((a, b) => 
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+    }
+    return logs.sort((a, b) => 
+      new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    );
+  }
+  
+  async getOrgExportData(orgid: string): Promise<{
+    organization: Org;
+    patients: Patient[];
+    visits: Visit[];
+    notes: VisitNote[];
+  } | null> {
+    const org = this.orgs.get(orgid);
+    if (!org) return null;
+    
+    const orgPatients = Array.from(this.patients.values()).filter(p => p.orgid === orgid);
+    const patientIds = new Set(orgPatients.map(p => p.patientid));
+    const orgVisits = Array.from(this.visits.values()).filter(v => patientIds.has(v.patientid));
+    const visitIds = new Set(orgVisits.map(v => v.visitid));
+    const orgNotes = Array.from(this.visitNotes.values()).filter(n => visitIds.has(n.visitid));
+    
+    return { organization: org, patients: orgPatients, visits: orgVisits, notes: orgNotes };
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -810,6 +874,62 @@ export class DatabaseStorage implements IStorage {
     const inactiveOrgs = inactiveResult[0]?.count || 0;
     
     return { totalPatients, totalEmployees, totalVisits, activeOrgs, inactiveOrgs };
+  }
+  
+  // Backup log operations
+  async createBackupLog(log: InsertBackupLog): Promise<BackupLog> {
+    const result = await db.insert(backup_logs).values(log).returning();
+    return result[0];
+  }
+  
+  async getBackupLogs(orgid?: string): Promise<BackupLog[]> {
+    if (orgid) {
+      return await db.select()
+        .from(backup_logs)
+        .where(eq(backup_logs.orgid, orgid))
+        .orderBy(desc(backup_logs.created_at));
+    }
+    return await db.select()
+      .from(backup_logs)
+      .orderBy(desc(backup_logs.created_at));
+  }
+  
+  async getOrgExportData(orgid: string): Promise<{
+    organization: Org;
+    patients: Patient[];
+    visits: Visit[];
+    notes: VisitNote[];
+  } | null> {
+    // Get organization
+    const org = await this.getOrg(orgid);
+    if (!org) return null;
+    
+    // Get all patients for this org
+    const orgPatients = await db.select()
+      .from(patients)
+      .where(eq(patients.orgid, orgid));
+    
+    if (orgPatients.length === 0) {
+      return { organization: org, patients: [], visits: [], notes: [] };
+    }
+    
+    // Get all visits for these patients
+    const patientIds = orgPatients.map(p => p.patientid);
+    const orgVisits = await db.select()
+      .from(visits)
+      .where(sql`${visits.patientid} = ANY(${patientIds})`);
+    
+    if (orgVisits.length === 0) {
+      return { organization: org, patients: orgPatients, visits: [], notes: [] };
+    }
+    
+    // Get all notes for these visits
+    const visitIds = orgVisits.map(v => v.visitid);
+    const orgNotes = await db.select()
+      .from(visit_notes)
+      .where(sql`${visit_notes.visitid} = ANY(${visitIds})`);
+    
+    return { organization: org, patients: orgPatients, visits: orgVisits, notes: orgNotes };
   }
 }
 
