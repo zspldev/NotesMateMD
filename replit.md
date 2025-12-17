@@ -39,6 +39,7 @@ Preferred communication style: Simple, everyday language.
 - **Token-Based Auth**: HMAC-signed access tokens for API authorization (24-hour expiration) with role and organization info.
 - **Login Flow**: Requires organization code for regular users; super admins can bypass.
 - **Super Admin Console**: Dashboard for managing organizations and impersonating organization contexts.
+- **Organization Management**: Super admins can create, edit, and deactivate organizations with first admin account setup.
 
 ### Key Features
 - **Medical Editor**: Supports SOAP Note, H&P, Progress Note, Procedure Note templates.
