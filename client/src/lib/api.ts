@@ -180,6 +180,18 @@ class ApiClient {
     }
   }
 
+  // Organizations (super admin only)
+  async getOrganizations(): Promise<{
+    orgid: string;
+    org_number: number | null;
+    org_shortname: string | null;
+    org_name: string;
+    org_type: string | null;
+    is_active: boolean | null;
+  }[]> {
+    return this.request('/organizations');
+  }
+
   // Patients
   async getPatients(orgid: string, search?: string): Promise<Patient[]> {
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';

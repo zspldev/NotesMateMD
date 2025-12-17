@@ -368,9 +368,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Organization routes
-  app.get("/api/organizations", async (req, res) => {
+  // Organization routes (protected - super admin only)
+  app.get("/api/organizations", requireAuth(), async (req, res) => {
     try {
+      const authContext = req.authContext!;
+      
+      // Only super admins can list all organizations
+      if (authContext.role !== 'super_admin') {
+        return res.status(403).json({ error: "Only super admins can list organizations" });
+      }
+      
       const orgs = await storage.getOrgs();
       res.json(orgs);
     } catch (error) {
@@ -379,9 +386,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/organizations/:orgid", async (req, res) => {
+  app.get("/api/organizations/:orgid", requireAuth(), async (req, res) => {
     try {
       const { orgid } = req.params;
+      const authContext = req.authContext!;
+      
+      // Only super admins or employees of the org can view it
+      if (authContext.role !== 'super_admin' && authContext.orgid !== orgid) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
       const org = await storage.getOrg(orgid);
       
       if (!org) {

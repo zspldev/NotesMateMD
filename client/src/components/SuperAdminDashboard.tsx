@@ -40,11 +40,7 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
     setIsLoading(true);
     setError("");
     try {
-      const response = await fetch('/api/organizations');
-      if (!response.ok) {
-        throw new Error('Failed to load organizations');
-      }
-      const orgs = await response.json();
+      const orgs = await api.getOrganizations();
       setOrganizations(orgs.filter((org: Organization) => org.org_number !== 1001));
     } catch (err) {
       console.error('Failed to load organizations:', err);
