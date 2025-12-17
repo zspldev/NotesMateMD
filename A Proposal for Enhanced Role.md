@@ -460,7 +460,7 @@ RETURNING mrn_sequence_current - 1 as new_mrn_number;
 
 Since MRN is no longer globally unique (same MRN can exist in different orgs), we have two options:
 
-**Option A: Composite Primary Key** (Recommended)
+**Option A: Composite Primary Key**
 ```typescript
 export const patients = pgTable("patients", {
   mrn: varchar("mrn", { length: 10 }).notNull(), // 6-digit numeric string
@@ -471,7 +471,7 @@ export const patients = pgTable("patients", {
 }));
 ```
 
-**Option B: Separate UUID Primary Key**
+**Option B: Separate UUID Primary Key** ✅ SELECTED
 ```typescript
 export const patients = pgTable("patients", {
   patientid: uuid("patientid").primaryKey().default(sql`gen_random_uuid()`),
@@ -483,7 +483,7 @@ export const patients = pgTable("patients", {
 }));
 ```
 
-**Recommendation**: Option B - Keeps a simple UUID primary key for foreign key references while ensuring MRN is unique within each org.
+**Decision**: Option B selected - Keeps a simple UUID primary key for foreign key references while ensuring MRN is unique within each org.
 
 ---
 
