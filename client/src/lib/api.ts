@@ -338,8 +338,15 @@ class ApiClient {
     formData.append('browser_name', deviceInfo.browserName);
     formData.append('user_agent', deviceInfo.userAgent);
 
+    const token = this.getAccessToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${this.baseUrl}/notes`, {
       method: 'POST',
+      headers,
       body: formData,
     });
 
@@ -381,8 +388,15 @@ class ApiClient {
     const extension = getFileExtension(audioBlob.type);
     formData.append('audio', audioBlob, `recording.${extension}`);
 
+    const token = this.getAccessToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${this.baseUrl}/transcribe`, {
       method: 'POST',
+      headers,
       body: formData,
     });
 
