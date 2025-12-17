@@ -11,9 +11,14 @@ import {
   Loader2,
   Settings,
   Stethoscope,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Download,
+  HardDrive,
+  FileDown,
+  Clock
 } from "lucide-react";
 import { api, type LoginResponse } from "../lib/api";
+import { format } from "date-fns";
 
 interface OrgAdminDashboardProps {
   loginData: LoginResponse;
@@ -27,10 +32,26 @@ interface OrgStats {
   totalNotes: number;
 }
 
+interface BackupLog {
+  backup_id: string;
+  orgid: string;
+  created_by_empid: string;
+  backup_type: string | null;
+  file_size_bytes: number | null;
+  patient_count: number | null;
+  visit_count: number | null;
+  note_count: number | null;
+  status: string | null;
+  error_message: string | null;
+  created_at: Date | string | null;
+}
+
 export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminDashboardProps) {
   const [stats, setStats] = useState<OrgStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [backupLogs, setBackupLogs] = useState<BackupLog[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
 
   const hasSecondaryRole = loginData.employee.secondary_role === 'doctor';
 
@@ -72,12 +93,80 @@ export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminD
         totalVisits,
         totalNotes
       });
+      
+      // Load backup logs
+      await loadBackupLogs();
     } catch (err) {
       console.error('Failed to load org stats:', err);
       setError('Failed to load organization statistics. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const loadBackupLogs = async () => {
+    try {
+      const response = await fetch('/api/backups/logs', {
+        headers: {
+          'Authorization': `Bearer ${api.getAccessToken()}`
+        }
+      });
+      if (response.ok) {
+        const logs = await response.json();
+        setBackupLogs(logs);
+      }
+    } catch (err) {
+      console.error('Failed to load backup logs:', err);
+    }
+  };
+  
+  const handleExportBackup = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch('/api/backups/export', {
+        headers: {
+          'Authorization': `Bearer ${api.getAccessToken()}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+      
+      // Get filename from Content-Disposition header
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'backup.json';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+      
+      // Download the file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      // Refresh backup logs
+      await loadBackupLogs();
+    } catch (err) {
+      console.error('Export failed:', err);
+      setError('Failed to export backup. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  const formatFileSize = (bytes: number | null): string => {
+    if (!bytes) return 'N/A';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const handleSwitchToDoctor = () => {
@@ -289,6 +378,78 @@ export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminD
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <CardTitle className="flex items-center gap-2">
+                  <HardDrive className="h-5 w-5" style={{ color: '#17a2b8' }} />
+                  Data Backup & Export
+                </CardTitle>
+                <Button
+                  onClick={handleExportBackup}
+                  disabled={isExporting}
+                  style={{ backgroundColor: '#17a2b8' }}
+                  data-testid="button-export-backup"
+                >
+                  {isExporting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  {isExporting ? 'Exporting...' : 'Export Backup'}
+                </Button>
+              </div>
+              <CardDescription>
+                Export your organization's data for backup or compliance purposes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {backupLogs.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No backups have been created yet. Click "Export Backup" to create your first backup.</p>
+              ) : (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium">Recent Backup History</h4>
+                  <div className="space-y-2">
+                    {backupLogs.slice(0, 5).map((log) => (
+                      <div 
+                        key={log.backup_id} 
+                        className="flex items-center justify-between p-3 rounded-md bg-muted/50"
+                        data-testid={`backup-log-${log.backup_id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileDown className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">
+                              {log.backup_type === 'full_export' ? 'Full Export' : log.backup_type}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {log.created_at ? format(new Date(log.created_at), 'MMM d, yyyy h:mm a') : 'Unknown'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right text-xs text-muted-foreground">
+                            <div>{formatFileSize(log.file_size_bytes)}</div>
+                            <div>
+                              {log.patient_count ?? 0} patients, {log.note_count ?? 0} notes
+                            </div>
+                          </div>
+                          <Badge 
+                            variant={log.status === 'completed' ? 'default' : 'destructive'}
+                            className={log.status === 'completed' ? 'bg-green-600' : ''}
+                          >
+                            {log.status || 'Unknown'}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

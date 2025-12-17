@@ -556,7 +556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         visits: exportData.visits,
         notes: exportData.notes.map(n => ({
           ...n,
-          audio_data: n.audio_data ? '[AUDIO_DATA_OMITTED]' : null // Don't include binary audio in export
+          audio_file: n.audio_file ? '[AUDIO_DATA_OMITTED]' : null // Don't include binary audio in export
         }))
       };
       
@@ -566,7 +566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log the backup
       await storage.createBackupLog({
         orgid: targetOrgId,
-        empid: authContext.empid,
+        created_by_empid: authContext.empid,
         backup_type: 'full_export',
         status: 'completed',
         file_size_bytes: fileSizeBytes,
