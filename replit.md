@@ -51,6 +51,7 @@ Preferred communication style: Simple, everyday language.
 - **PDF Export**: Export clinical notes with date range selection and professional formatting.
 - **Audio Playback Fix**: Byte-level audio format detection for cross-platform (especially iOS) compatibility.
 - **Audit Trail**: Tracks device, browser, IP address, and user agent for note creation.
+- **Org-Level Backup**: Organization admins can export all org data (patients, visits, notes) as JSON. All backups are logged with file size, record counts, and timestamps. Super admins can view backup activity across all organizations.
 
 ### Medical Domain Model
 - **Organizations**: Multi-tenant support with unique `org_number` and `org_shortname`.
