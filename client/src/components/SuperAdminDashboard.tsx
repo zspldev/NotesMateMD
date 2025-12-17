@@ -12,11 +12,15 @@ import {
   Loader2,
   Plus,
   Pencil,
-  Shield
+  Shield,
+  HardDrive,
+  FileDown,
+  Clock
 } from "lucide-react";
 import { api, type LoginResponse } from "../lib/api";
 import AddOrganizationDialog from "./AddOrganizationDialog";
 import EditOrganizationDialog from "./EditOrganizationDialog";
+import { format } from "date-fns";
 
 interface SuperAdminDashboardProps {
   loginData: LoginResponse;
@@ -40,6 +44,20 @@ interface PlatformStats {
   inactiveOrgs: number;
 }
 
+interface BackupLog {
+  backup_id: string;
+  orgid: string;
+  created_by_empid: string;
+  backup_type: string | null;
+  file_size_bytes: number | null;
+  patient_count: number | null;
+  visit_count: number | null;
+  note_count: number | null;
+  status: string | null;
+  error_message: string | null;
+  created_at: Date | string | null;
+}
+
 export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdminDashboardProps) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [stats, setStats] = useState<PlatformStats | null>(null);
@@ -48,6 +66,7 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
+  const [backupLogs, setBackupLogs] = useState<BackupLog[]>([]);
 
   useEffect(() => {
     loadData();
@@ -63,12 +82,43 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
       ]);
       setOrganizations(orgs.filter((org: Organization) => org.org_number !== 1001));
       setStats(platformStats);
+      
+      // Load backup logs
+      await loadBackupLogs();
     } catch (err) {
       console.error('Failed to load data:', err);
       setError('Failed to load data. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const loadBackupLogs = async () => {
+    try {
+      const response = await fetch('/api/backups/logs', {
+        headers: {
+          'Authorization': `Bearer ${api.getAccessToken()}`
+        }
+      });
+      if (response.ok) {
+        const logs = await response.json();
+        setBackupLogs(logs);
+      }
+    } catch (err) {
+      console.error('Failed to load backup logs:', err);
+    }
+  };
+  
+  const formatFileSize = (bytes: number | null): string => {
+    if (!bytes) return 'N/A';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+  
+  const getOrgNameById = (orgid: string): string => {
+    const org = organizations.find(o => o.orgid === orgid);
+    return org?.org_shortname || org?.org_name || 'Unknown Org';
   };
 
   const handleLoginToOrg = (orgNumber: number) => {
@@ -254,6 +304,60 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
                       <LogIn className="h-4 w-4 mr-2" />
                       Enter
                     </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HardDrive className="h-5 w-5" style={{ color: '#17a2b8' }} />
+            Platform Backup Activity
+          </CardTitle>
+          <CardDescription>
+            View backup exports across all organizations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {backupLogs.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No backups have been created yet by any organization.</p>
+          ) : (
+            <div className="space-y-2">
+              {backupLogs.slice(0, 10).map((log) => (
+                <div 
+                  key={log.backup_id} 
+                  className="flex items-center justify-between p-3 rounded-md bg-muted/50"
+                  data-testid={`backup-log-${log.backup_id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <FileDown className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">
+                        {getOrgNameById(log.orgid)} - {log.backup_type === 'full_export' ? 'Full Export' : log.backup_type}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {log.created_at ? format(new Date(log.created_at), 'MMM d, yyyy h:mm a') : 'Unknown'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right text-xs text-muted-foreground">
+                      <div>{formatFileSize(log.file_size_bytes)}</div>
+                      <div>
+                        {log.patient_count ?? 0} patients, {log.note_count ?? 0} notes
+                      </div>
+                    </div>
+                    <Badge 
+                      variant={log.status === 'completed' ? 'default' : 'destructive'}
+                      className={log.status === 'completed' ? 'bg-green-600' : ''}
+                    >
+                      {log.status || 'Unknown'}
+                    </Badge>
                   </div>
                 </div>
               ))}
