@@ -17,7 +17,7 @@
 | Role Naming | "Provider" renamed to "Doctor" |
 | Patient Ownership | Patients belong to Org (not doctor) - any doctor in org can see all patients |
 | Login with Org ID | All users specify Org ID at login (5-digit, starting at 1001) |
-| MRN per Org | Each org has separate MRN sequence (6-digit, starting at 100001) |
+| MRN per Org | Each org has separate MRN sequence (6-digit numeric only, starting at 100001) |
 | Org Shortname | Each org has unique 6-char alphanumeric shortname |
 
 ---
@@ -145,19 +145,22 @@ export const employees = pgTable("employees", {
 - `doctor` - Clinical staff (doctors, nurses, PAs) with full patient access
 - `staff` - Non-clinical staff (front desk, assistants) with basic patient info only
 
-### Patients Table (Unchanged - Already Org-Based)
+### Patients Table (Modified)
 
 ```typescript
 export const patients = pgTable("patients", {
-  patientid: varchar("patientid", { length: 50 }).primaryKey(), // MRN format: ORG_SHORTNAME + sequence
+  patientid: varchar("patientid", { length: 50 }).primaryKey(), // MRN: 6-digit numeric (100001, 100002...)
   orgid: uuid("orgid").references(() => orgs.orgid).notNull(),
   // ... rest unchanged
 });
 ```
 
-**MRN Format**: `{ORG_SHORTNAME}{6-digit-sequence}`
-- Example for org "CITYH1": CITYH1100001, CITYH1100002, CITYH1100003...
-- Example for org "OAKCLC": OAKCLC100001, OAKCLC100002, OAKCLC100003...
+**MRN Format**: 6-digit numeric only (no org prefix)
+- Each org has its own sequence starting at 100001
+- Example for Org A: 100001, 100002, 100003...
+- Example for Org B: 100001, 100002, 100003... (same numbers, different org)
+- MRN is unique within an org, but not globally unique
+- Patient lookup requires both orgid + MRN
 
 ---
 
@@ -425,17 +428,17 @@ When super admin impersonates a user:
 ### Per-Organization MRN Sequence
 
 ```typescript
-// When creating a new patient in Org "CITYH1":
+// When creating a new patient in Org A (orgid = "abc-123"):
 1. Get org.mrn_sequence_current (e.g., 100001)
-2. Generate MRN: "CITYH1" + "100001" = "CITYH1100001"
+2. Generate MRN: "100001" (6-digit numeric only)
 3. Increment org.mrn_sequence_current to 100002
-4. Save patient with patientid = "CITYH1100001"
+4. Save patient with patientid = "100001", orgid = "abc-123"
 
 // Next patient in same org:
-MRN = "CITYH1100002"
+MRN = "100002"
 
-// Patient in different org "OAKCLC":
-MRN = "OAKCLC100001" (each org has its own sequence)
+// Patient in different org B (orgid = "def-456"):
+MRN = "100001" (each org has its own sequence, same numbers allowed)
 ```
 
 ### Database Sequence Management
@@ -448,10 +451,39 @@ MRN = "OAKCLC100001" (each org has its own sequence)
 UPDATE orgs 
 SET mrn_sequence_current = mrn_sequence_current + 1 
 WHERE orgid = :orgid
-RETURNING org_shortname, mrn_sequence_current - 1 as new_mrn_number;
+RETURNING mrn_sequence_current - 1 as new_mrn_number;
 
--- Result: patientid = org_shortname + new_mrn_number
+-- Result: patientid = new_mrn_number (6-digit string)
 ```
+
+### Primary Key Consideration
+
+Since MRN is no longer globally unique (same MRN can exist in different orgs), we have two options:
+
+**Option A: Composite Primary Key** (Recommended)
+```typescript
+export const patients = pgTable("patients", {
+  mrn: varchar("mrn", { length: 10 }).notNull(), // 6-digit numeric string
+  orgid: uuid("orgid").references(() => orgs.orgid).notNull(),
+  // ... other fields
+}, (table) => ({
+  pk: primaryKey({ columns: [table.orgid, table.mrn] }), // Composite PK
+}));
+```
+
+**Option B: Separate UUID Primary Key**
+```typescript
+export const patients = pgTable("patients", {
+  patientid: uuid("patientid").primaryKey().default(sql`gen_random_uuid()`),
+  mrn: varchar("mrn", { length: 10 }).notNull(), // 6-digit numeric string
+  orgid: uuid("orgid").references(() => orgs.orgid).notNull(),
+  // ... other fields
+}, (table) => ({
+  uniqueMrnPerOrg: unique().on(table.orgid, table.mrn), // Unique constraint
+}));
+```
+
+**Recommendation**: Option B - Keeps a simple UUID primary key for foreign key references while ensuring MRN is unique within each org.
 
 ---
 
@@ -522,7 +554,7 @@ RETURNING org_shortname, mrn_sequence_current - 1 as new_mrn_number;
 2. **Login**: Requires 5-digit Org ID (except super admin)
 3. **Org ID**: Auto-generated, starts at 1001
 4. **Org Shortname**: User-defined, 6-char alphanumeric, unique
-5. **MRN Format**: {ORG_SHORTNAME}{6-digit-sequence} e.g., CITYH1100001
+5. **MRN Format**: 6-digit numeric only (e.g., 100001, 100002) - unique per org, not globally
 6. **Patient Access**: All doctors in org see ALL patients (org-based, not doctor-based)
 7. **Multiple Org Admins**: Allowed per organization
 8. **Impersonation**: Super admins can login as any user
