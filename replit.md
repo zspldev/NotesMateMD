@@ -152,10 +152,33 @@ Preferred communication style: Simple, everyday language.
     - `doctor`: Full clinical access, create visits, record notes, view all patients
     - `staff`: Basic patient info only, no clinical note access
   - Files: `shared/schema.ts`, `server/storage.ts`, `A Proposal for Enhanced Role.md`
-  - **Next Phase**: Org-based login flow, role-aware UI, permission middleware
+
+- **Enhanced Roles System (Phase 2 - Login Flow & Token-Based Authorization)**: Org-based login and API protection
+  - **Login Page Updates**:
+    - Added Organization Code field (4-digit org_number, e.g., 1002)
+    - Super admins can login without org code
+    - Regular users require valid org code matching their organization
+    - Updated demo credentials display to show org code
+  - **Backend Authentication Updates**:
+    - Login validates org_code against org_number in database
+    - Checks employee.is_active and org.is_active before allowing login
+    - Verifies employee belongs to the specified organization
+    - Returns role and organization info in login response
+  - **Access Token System** (NEW):
+    - HMAC-signed access tokens generated on login (server/auth.ts)
+    - Token contains: empid, orgid, role, impersonatedOrgId, expiration (24 hours)
+    - Frontend stores token in sessionStorage and sends via Authorization header
+    - `requireAuth(permission?)` middleware validates tokens and enforces permissions
+  - **Protected API Routes**:
+    - All patient routes protected with view_patients/manage_patients permissions
+    - All visit routes protected with view_notes/create_visits permissions
+    - All note routes protected with view_notes/create_notes permissions
+    - Orgid derived from token (not client request) to prevent tampering
+  - Files: `server/auth.ts`, `server/routes.ts`, `client/src/lib/api.ts`
+  - **Security**: Unauthenticated requests return 401, insufficient permissions return 403
 
 ### Known Technical Considerations
-- **Security Enhancement Opportunity**: Currently, the backend accepts orgid from client request body. Future improvement should derive orgid from authenticated session to prevent potential tampering.
+- **Token-Based Auth**: API routes now use HMAC-signed tokens for authorization. Token secret uses SESSION_SECRET env var (defaults to dev secret if not set - change in production!).
 - **MRN Sequence Management**: The `mrn_sequence` must exist in all deployment environments. Monitor logs for MRN creation errors to catch misconfigured sequences early.
 - **AI Integration**: Uses Replit AI Integrations for OpenAI access (no separate API key required). Charges are billed to Replit credits.
 - **iOS Audio Compatibility**: Uses byte-level format detection because iOS browsers lie about MediaRecorder MIME types. The `detectAudioFormat()` function must be used for all audio playback to ensure cross-platform compatibility.

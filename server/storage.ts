@@ -15,6 +15,7 @@ export interface IStorage {
   // Organization operations
   getOrgs(): Promise<Org[]>;
   getOrg(orgid: string): Promise<Org | undefined>;
+  getOrgByOrgNumber(orgNumber: number): Promise<Org | undefined>;
   createOrg(org: InsertOrg): Promise<Org>;
 
   // Employee operations
@@ -249,6 +250,10 @@ export class MemStorage implements IStorage {
 
   async getOrg(orgid: string): Promise<Org | undefined> {
     return this.orgs.get(orgid);
+  }
+
+  async getOrgByOrgNumber(orgNumber: number): Promise<Org | undefined> {
+    return Array.from(this.orgs.values()).find(org => org.org_number === orgNumber);
   }
 
   async createOrg(insertOrg: InsertOrg): Promise<Org> {
@@ -491,6 +496,11 @@ export class DatabaseStorage implements IStorage {
 
   async getOrg(orgid: string): Promise<Org | undefined> {
     const result = await db.select().from(orgs).where(eq(orgs.orgid, orgid));
+    return result[0];
+  }
+
+  async getOrgByOrgNumber(orgNumber: number): Promise<Org | undefined> {
+    const result = await db.select().from(orgs).where(eq(orgs.org_number, orgNumber));
     return result[0];
   }
 

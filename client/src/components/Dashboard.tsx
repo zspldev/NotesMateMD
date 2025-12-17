@@ -92,8 +92,24 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     firstName: loginData.employee.first_name,
     lastName: loginData.employee.last_name,
     title: loginData.employee.title || 'Unknown',
-    orgName: loginData.organization?.org_name || 'Unknown Organization'
+    orgName: loginData.organization?.org_name || 'Unknown Organization',
+    role: loginData.employee.role
   };
+
+  // Get the effective orgid (from login data, may be null for super_admin without org context)
+  const effectiveOrgId = loginData.organization?.orgid || loginData.employee.orgid;
+  
+  // Role-based permission helpers
+  const isSuperAdmin = loginData.employee.role === 'super_admin';
+  const isOrgAdmin = loginData.employee.role === 'org_admin';
+  const isDoctor = loginData.employee.role === 'doctor';
+  const isStaff = loginData.employee.role === 'staff';
+  
+  // Permission checks
+  const canManagePatients = isSuperAdmin || isOrgAdmin || isDoctor;
+  const canViewClinicalNotes = isSuperAdmin || isOrgAdmin || isDoctor;
+  const canCreateNotes = isSuperAdmin || isOrgAdmin || isDoctor;
+  const canExportData = isSuperAdmin || isOrgAdmin || isDoctor;
 
   // Map API Patient to UI Patient
   const mapPatientToUI = useCallback((patient: Patient): UIPatient => ({
@@ -149,10 +165,16 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   // Load patients on mount
   useEffect(() => {
     const loadPatients = async () => {
+      // Super admin without org context - show message instead of loading patients
+      if (!effectiveOrgId) {
+        setError('Please log in with an organization code to access patient data.');
+        return;
+      }
+      
       setIsLoading(true);
       setError("");
       try {
-        const patientsData = await api.getPatients(loginData.employee.orgid);
+        const patientsData = await api.getPatients(effectiveOrgId);
         const uiPatients = patientsData.map(mapPatientToUI);
         setPatients(uiPatients);
       } catch (error) {
@@ -164,7 +186,7 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
     };
     
     loadPatients();
-  }, [loginData.employee.orgid, mapPatientToUI]);
+  }, [effectiveOrgId, mapPatientToUI]);
 
   const handleSelectPatient = useCallback(async (patientId: string) => {
     const patient = await api.getPatient(patientId);
@@ -209,14 +231,15 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
   }, []);
 
   const handleRefreshPatients = useCallback(async () => {
+    if (!effectiveOrgId) return;
     try {
-      const patientsData = await api.getPatients(loginData.employee.orgid);
+      const patientsData = await api.getPatients(effectiveOrgId);
       const uiPatients = patientsData.map(mapPatientToUI);
       setPatients(uiPatients);
     } catch (error) {
       console.error('Failed to refresh patients:', error);
     }
-  }, [loginData.employee.orgid, mapPatientToUI]);
+  }, [effectiveOrgId, mapPatientToUI]);
 
   const handlePatientCreation = useCallback(async (patientData: InsertPatient) => {
     try {
@@ -575,12 +598,14 @@ export default function Dashboard({ loginData, onLogout }: DashboardProps) {
       </main>
 
       {/* New Patient Dialog */}
-      <NewPatientDialog
-        open={isNewPatientDialogOpen}
-        onOpenChange={setIsNewPatientDialogOpen}
-        onCreatePatient={handlePatientCreation}
-        orgId={loginData.employee.orgid}
-      />
+      {effectiveOrgId && (
+        <NewPatientDialog
+          open={isNewPatientDialogOpen}
+          onOpenChange={setIsNewPatientDialogOpen}
+          onCreatePatient={handlePatientCreation}
+          orgId={effectiveOrgId}
+        />
+      )}
 
       {/* Export PDF Dialog */}
       {selectedPatient && (

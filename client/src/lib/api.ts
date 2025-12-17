@@ -3,6 +3,7 @@ import type { InsertPatient } from "@shared/schema";
 import { getDeviceInfo } from './deviceInfo';
 
 export interface LoginCredentials {
+  org_code?: string;
   username: string;
   password: string;
 }
@@ -10,21 +11,26 @@ export interface LoginCredentials {
 export interface LoginResponse {
   employee: {
     empid: string;
-    orgid: string;
+    orgid: string | null;
     username: string;
     first_name: string;
     last_name: string;
     title: string | null;
+    role: string | null;
+    is_active: boolean | null;
     created_at: Date;
   };
   organization: {
     orgid: string;
+    org_number: number | null;
+    org_shortname: string | null;
     org_name: string;
     org_type: string | null;
     address: string | null;
     phone: string | null;
     created_at: Date;
   } | null;
+  accessToken: string;
 }
 
 export interface Patient {
@@ -75,21 +81,42 @@ export interface VisitNoteResponse extends VisitNote {
   ai_transcribed?: boolean;
 }
 
+const ACCESS_TOKEN_KEY = 'notesmate_access_token';
+
 class ApiClient {
   private baseUrl = '/api';
+
+  getAccessToken(): string | null {
+    return sessionStorage.getItem(ACCESS_TOKEN_KEY);
+  }
+
+  setAccessToken(token: string): void {
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+  }
+
+  clearAccessToken(): void {
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  }
 
   private async request<T>(
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    const token = this.getAccessToken();
+    
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string> || {}),
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     
     const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
       ...options,
+      headers,
     });
 
     if (!response.ok) {
@@ -102,10 +129,17 @@ class ApiClient {
 
   // Authentication
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    return this.request<LoginResponse>('/auth/login', {
+    const response = await this.request<LoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
+    
+    // Store the access token
+    if (response.accessToken) {
+      this.setAccessToken(response.accessToken);
+    }
+    
+    return response;
   }
 
   // Patients

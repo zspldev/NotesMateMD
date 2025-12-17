@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { User, Lock } from "lucide-react";
+import { User, Lock, Building2 } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Dashboard from "@/components/Dashboard";
 import ColorPreview from "@/pages/ColorPreview";
@@ -21,6 +21,7 @@ import logoWordmark from "@assets/NotesMateMD-Logo-New-Words-NoBG_1765432453100.
 import zsplLogo from "@assets/ZSPL-Logo-Symbol-Name-NoBG_1765432873353.png";
 
 function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void }) {
+  const [orgCode, setOrgCode] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +33,11 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
     setError("");
     
     try {
-      const loginData = await api.login({ username, password });
+      const loginData = await api.login({ 
+        org_code: orgCode || undefined, 
+        username, 
+        password 
+      });
       onLogin(loginData);
       console.log('Login successful');
     } catch (error) {
@@ -83,6 +88,22 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
+              <label className="text-sm font-medium">Organization Code</label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  value={orgCode}
+                  onChange={(e) => setOrgCode(e.target.value)}
+                  placeholder="Enter 4-digit org code (e.g. 1002)"
+                  className="pl-10"
+                  data-testid="input-org-code"
+                  maxLength={4}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Leave blank for super admin login</p>
+            </div>
+            <div className="space-y-2">
               <label className="text-sm font-medium">Username</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -126,8 +147,10 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
               {isLoading ? "Signing In..." : "Sign In"}
             </Button>
           </form>
-          <div className="mt-6 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground">
-            <strong>Demo Credentials:</strong> Username: dr.smith, Password: simple123
+          <div className="mt-6 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground space-y-1">
+            <p><strong>Demo Credentials:</strong></p>
+            <p>Org: 1002, User: dr.smith, Pass: simple123</p>
+            <p>Super Admin: super.admin, Pass: simple123</p>
           </div>
         </CardContent>
       </Card>

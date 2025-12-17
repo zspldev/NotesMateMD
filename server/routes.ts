@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
@@ -21,6 +21,99 @@ import {
 import { generatePatientNotesPDF, generatePatientNotesFilename } from "./pdf-service";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { createAccessToken, verifyAccessToken, type AuthContext } from "./auth";
+
+// Role-based access control definitions
+export const ROLES = {
+  SUPER_ADMIN: 'super_admin',
+  ORG_ADMIN: 'org_admin',
+  DOCTOR: 'doctor',
+  STAFF: 'staff'
+} as const;
+
+export type Role = typeof ROLES[keyof typeof ROLES];
+
+// Permissions by role
+export const ROLE_PERMISSIONS = {
+  [ROLES.SUPER_ADMIN]: [
+    'view_all_orgs', 'manage_orgs', 'impersonate',
+    'view_all_employees', 'manage_employees',
+    'view_patients', 'manage_patients',
+    'view_visits', 'create_visits', 'manage_visits',
+    'view_notes', 'create_notes', 'manage_notes',
+    'export_data', 'view_audit_logs'
+  ],
+  [ROLES.ORG_ADMIN]: [
+    'view_org_settings', 'manage_org_settings',
+    'view_all_employees', 'manage_employees',
+    'view_patients', 'manage_patients',
+    'view_visits', 'create_visits', 'manage_visits',
+    'view_notes', 'create_notes', 'manage_notes',
+    'export_data', 'view_audit_logs'
+  ],
+  [ROLES.DOCTOR]: [
+    'view_patients', 'manage_patients',
+    'view_visits', 'create_visits', 'manage_visits',
+    'view_notes', 'create_notes', 'manage_notes',
+    'export_data'
+  ],
+  [ROLES.STAFF]: [
+    'view_patients'  // Staff can view patient list (basic info only enforced at UI level)
+  ]
+} as const;
+
+// Helper function to check if a role has a specific permission
+export function hasPermission(role: string | null, permission: string): boolean {
+  if (!role) return false;
+  const permissions = ROLE_PERMISSIONS[role as Role] as readonly string[] | undefined;
+  if (!permissions) return false;
+  return permissions.includes(permission);
+}
+
+// Helper function to check if role can access clinical notes
+export function canAccessClinicalNotes(role: string | null): boolean {
+  return hasPermission(role, 'view_notes');
+}
+
+// Helper function to check if role can manage patients
+export function canManagePatients(role: string | null): boolean {
+  return hasPermission(role, 'manage_patients');
+}
+
+// Extend Express Request type to include auth context
+declare global {
+  namespace Express {
+    interface Request {
+      authContext?: AuthContext;
+    }
+  }
+}
+
+// Authentication middleware to verify access token and extract auth context
+function requireAuth(permission?: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    const token = authHeader.substring(7);
+    const authContext = verifyAccessToken(token);
+    
+    if (!authContext) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    
+    // Check permission if specified
+    if (permission && !hasPermission(authContext.role, permission)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    
+    req.authContext = authContext;
+    next();
+  };
+}
 
 // Configure multer for audio file uploads
 const upload = multer({
@@ -73,25 +166,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { org_code, username, password } = req.body;
       
       if (!username || !password) {
         return res.status(400).json({ error: "Username and password are required" });
       }
 
+      // Authenticate the user first
       const employee = await storage.authenticateEmployee(username, password);
       if (!employee) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
-      // Get organization info (may be null for super_admin)
-      const org = employee.orgid ? await storage.getOrg(employee.orgid) : null;
-      
+      // Check if employee is active
+      if (employee.is_active === false) {
+        return res.status(401).json({ error: "Account is deactivated. Please contact your administrator." });
+      }
+
+      // Super admin can login without org code
+      if (employee.role === 'super_admin') {
+        const { password_hash, ...employeeData } = employee;
+        // If super admin provided an org_code, get that org for impersonation context
+        let org = null;
+        if (org_code) {
+          const orgNumber = parseInt(org_code, 10);
+          if (!isNaN(orgNumber)) {
+            org = await storage.getOrgByOrgNumber(orgNumber);
+          }
+        }
+        
+        // Create access token for super admin
+        const accessToken = createAccessToken({
+          empid: employee.empid,
+          orgid: employee.orgid,
+          role: employee.role || 'doctor',
+          impersonatedOrgId: org?.orgid
+        });
+        
+        return res.json({
+          employee: employeeData,
+          organization: org,
+          accessToken
+        });
+      }
+
+      // For non-super_admin, org_code is required
+      if (!org_code) {
+        return res.status(400).json({ error: "Organization code is required" });
+      }
+
+      // Parse org_code as number
+      const orgNumber = parseInt(org_code, 10);
+      if (isNaN(orgNumber)) {
+        return res.status(400).json({ error: "Invalid organization code format" });
+      }
+
+      // Validate org exists and is active
+      const org = await storage.getOrgByOrgNumber(orgNumber);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      if (org.is_active === false) {
+        return res.status(403).json({ error: "Organization is not active" });
+      }
+
+      // Validate employee belongs to this org
+      if (employee.orgid !== org.orgid) {
+        return res.status(403).json({ error: "You are not a member of this organization" });
+      }
+
+      // Create access token for regular user
+      const accessToken = createAccessToken({
+        empid: employee.empid,
+        orgid: employee.orgid,
+        role: employee.role || 'doctor'
+      });
+
       // Return employee info without password hash
       const { password_hash, ...employeeData } = employee;
       res.json({
         employee: employeeData,
-        organization: org
+        organization: org,
+        accessToken
       });
     } catch (error: any) {
       console.error('Login error:', error);
@@ -130,20 +286,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Patient routes
-  app.get("/api/patients", async (req, res) => {
+  // Patient routes (protected with requireAuth)
+  app.get("/api/patients", requireAuth('view_patients'), async (req, res) => {
     try {
-      const { orgid, search } = req.query;
+      const { search } = req.query;
+      const authContext = req.authContext!;
       
-      if (!orgid) {
-        return res.status(400).json({ error: "Organization ID is required" });
+      // Use orgid from token (super admin with impersonation, or user's org)
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      if (!effectiveOrgId) {
+        return res.status(400).json({ error: "No organization context. Super admins must login with an org code." });
       }
 
       let patients;
       if (search && typeof search === 'string') {
-        patients = await storage.searchPatients(orgid as string, search);
+        patients = await storage.searchPatients(effectiveOrgId, search);
       } else {
-        patients = await storage.getPatients(orgid as string);
+        patients = await storage.getPatients(effectiveOrgId);
       }
 
       // Add last visit date for each patient
@@ -162,13 +322,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/patients/:patientid", async (req, res) => {
+  app.get("/api/patients/:patientid", requireAuth('view_patients'), async (req, res) => {
     try {
       const { patientid } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
       const patient = await storage.getPatient(patientid);
       
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      // Verify patient belongs to user's org (cross-org protection)
+      if (effectiveOrgId && patient.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: patient not in your organization" });
       }
       
       res.json(patient);
@@ -178,9 +346,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/patients", async (req, res) => {
+  app.post("/api/patients", requireAuth('manage_patients'), async (req, res) => {
     try {
-      const validatedData = insertPatientSchema.parse(req.body);
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      if (!effectiveOrgId) {
+        return res.status(400).json({ error: "No organization context" });
+      }
+      
+      const validatedData = insertPatientSchema.parse({
+        ...req.body,
+        orgid: effectiveOrgId  // Use org from token, not from request body
+      });
       
       // Auto-generate MRN using database sequence
       const result = await db.execute(sql`SELECT nextval('mrn_sequence')`);
@@ -202,15 +380,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/patients/:patientid", async (req, res) => {
+  app.put("/api/patients/:patientid", requireAuth('manage_patients'), async (req, res) => {
     try {
       const { patientid } = req.params;
-      const updates = insertPatientSchema.partial().parse(req.body);
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
       
-      const updatedPatient = await storage.updatePatient(patientid, updates);
-      if (!updatedPatient) {
+      // Verify patient belongs to user's org
+      const existingPatient = await storage.getPatient(patientid);
+      if (!existingPatient) {
         return res.status(404).json({ error: "Patient not found" });
       }
+      if (effectiveOrgId && existingPatient.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: patient not in your organization" });
+      }
+      
+      const updates = insertPatientSchema.partial().parse(req.body);
+      const updatedPatient = await storage.updatePatient(patientid, updates);
       
       res.json(updatedPatient);
     } catch (error) {
@@ -219,14 +405,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/patients/:patientid", async (req, res) => {
+  app.delete("/api/patients/:patientid", requireAuth('manage_patients'), async (req, res) => {
     try {
       const { patientid } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
       
       // Check if patient exists first
       const patient = await storage.getPatient(patientid);
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      // Verify patient belongs to user's org
+      if (effectiveOrgId && patient.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: patient not in your organization" });
       }
       
       // Delete patient and all associated records (visits, notes)
@@ -243,7 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PDF Export route
-  app.get("/api/patients/:patientid/notes/export", async (req, res) => {
+  app.get("/api/patients/:patientid/notes/export", requireAuth('view_notes'), async (req, res) => {
     try {
       const { patientid } = req.params;
       const { startDate, endDate } = req.query;
@@ -284,15 +477,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Visit routes
-  app.get("/api/patients/:patientid/visits", async (req, res) => {
+  // Visit routes (protected)
+  app.get("/api/patients/:patientid/visits", requireAuth('view_notes'), async (req, res) => {
     try {
       const { patientid } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
       
       // Check if patient exists
       const patient = await storage.getPatient(patientid);
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      // Verify patient belongs to user's org
+      if (effectiveOrgId && patient.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: patient not in your organization" });
       }
 
       const visits = await storage.getVisits(patientid);
@@ -319,18 +519,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/visits/:visitid", async (req, res) => {
+  app.get("/api/visits/:visitid", requireAuth('view_notes'), async (req, res) => {
     try {
       const { visitid } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
       const visit = await storage.getVisit(visitid);
       
       if (!visit) {
         return res.status(404).json({ error: "Visit not found" });
       }
       
+      // Get patient and verify org ownership
+      const patient = await storage.getPatient(visit.patientid);
+      if (effectiveOrgId && patient && patient.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: visit not in your organization" });
+      }
+      
       // Get additional details
       const employee = await storage.getEmployee(visit.empid);
-      const patient = await storage.getPatient(visit.patientid);
       const notes = await storage.getVisitNotes(visitid);
       
       res.json({
@@ -345,9 +553,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/visits", async (req, res) => {
+  app.post("/api/visits", requireAuth('create_visits'), async (req, res) => {
     try {
-      const validatedData = insertVisitSchema.parse(req.body);
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      // Verify patient belongs to user's org before creating visit
+      const patientid = req.body.patientid;
+      if (!patientid) {
+        return res.status(400).json({ error: "Patient ID is required" });
+      }
+      
+      const patient = await storage.getPatient(patientid);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      if (effectiveOrgId && patient.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: cannot create visit for patient outside your organization" });
+      }
+      
+      // Server-side override: use empid from token, not from client request
+      const visitData = {
+        ...req.body,
+        empid: authContext.empid  // Always use authenticated employee's ID
+      };
+      
+      const validatedData = insertVisitSchema.parse(visitData);
       const visit = await storage.createVisit(validatedData);
       res.status(201).json(visit);
     } catch (error) {
@@ -356,10 +587,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Visit Notes routes
-  app.get("/api/visits/:visitid/notes", async (req, res) => {
+  // Visit Notes routes (protected with org-scoping)
+  app.get("/api/visits/:visitid/notes", requireAuth('view_notes'), async (req, res) => {
     try {
       const { visitid } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      // Verify visit's patient belongs to user's org
+      const visit = await storage.getVisit(visitid);
+      if (visit) {
+        const patient = await storage.getPatient(visit.patientid);
+        if (effectiveOrgId && patient && patient.orgid !== effectiveOrgId) {
+          return res.status(403).json({ error: "Access denied: notes not in your organization" });
+        }
+      }
+      
       const notes = await storage.getVisitNotes(visitid);
       res.json(notes);
     } catch (error) {
@@ -368,13 +611,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/notes/:noteid", async (req, res) => {
+  app.get("/api/notes/:noteid", requireAuth('view_notes'), async (req, res) => {
     try {
       const { noteid } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
       const note = await storage.getVisitNote(noteid);
       
       if (!note) {
         return res.status(404).json({ error: "Note not found" });
+      }
+      
+      // Verify note's visit's patient belongs to user's org
+      const visit = await storage.getVisit(note.visitid);
+      if (visit) {
+        const patient = await storage.getPatient(visit.patientid);
+        if (effectiveOrgId && patient && patient.orgid !== effectiveOrgId) {
+          return res.status(403).json({ error: "Access denied: note not in your organization" });
+        }
       }
       
       res.json(note);
@@ -384,8 +639,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/notes", upload.single('audio'), async (req, res) => {
+  app.post("/api/notes", requireAuth('create_notes'), upload.single('audio'), async (req, res) => {
     try {
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      // Verify visit belongs to user's org
+      const visitid = req.body.visitid;
+      if (visitid) {
+        const visit = await storage.getVisit(visitid);
+        if (visit) {
+          const patient = await storage.getPatient(visit.patientid);
+          if (effectiveOrgId && patient && patient.orgid !== effectiveOrgId) {
+            return res.status(403).json({ error: "Access denied: cannot create note for visit outside your organization" });
+          }
+        }
+      }
+      
       // Check if manual transcription was provided (must be non-empty after trimming)
       const rawTranscription = req.body.transcription_text;
       const trimmedTranscription = rawTranscription?.trim() || '';
@@ -478,15 +748,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/notes/:noteid", async (req, res) => {
+  app.put("/api/notes/:noteid", requireAuth('manage_notes'), async (req, res) => {
     try {
       const { noteid } = req.params;
-      const updates = insertVisitNoteSchema.partial().parse(req.body);
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
       
-      const updatedNote = await storage.updateVisitNote(noteid, updates);
-      if (!updatedNote) {
+      const existingNote = await storage.getVisitNote(noteid);
+      if (!existingNote) {
         return res.status(404).json({ error: "Note not found" });
       }
+      
+      // Verify note's visit's patient belongs to user's org
+      const visit = await storage.getVisit(existingNote.visitid);
+      if (visit) {
+        const patient = await storage.getPatient(visit.patientid);
+        if (effectiveOrgId && patient && patient.orgid !== effectiveOrgId) {
+          return res.status(403).json({ error: "Access denied: note not in your organization" });
+        }
+      }
+      
+      const updates = insertVisitNoteSchema.partial().parse(req.body);
+      const updatedNote = await storage.updateVisitNote(noteid, updates);
       
       res.json(updatedNote);
     } catch (error) {
@@ -495,14 +778,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Audio file download route
-  app.get("/api/notes/:noteid/audio", async (req, res) => {
+  // Audio file download route (protected with org-scoping)
+  app.get("/api/notes/:noteid/audio", requireAuth('view_notes'), async (req, res) => {
     try {
       const { noteid } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
       const note = await storage.getVisitNote(noteid);
       
       if (!note || !note.audio_file) {
         return res.status(404).json({ error: "Audio file not found" });
+      }
+      
+      // Verify note's visit's patient belongs to user's org
+      const visit = await storage.getVisit(note.visitid);
+      if (visit) {
+        const patient = await storage.getPatient(visit.patientid);
+        if (effectiveOrgId && patient && patient.orgid !== effectiveOrgId) {
+          return res.status(403).json({ error: "Access denied: audio not in your organization" });
+        }
       }
 
       const audioBuffer = Buffer.from(note.audio_file, 'base64');
@@ -518,8 +813,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Transcription-only endpoint (doesn't save to database)
-  app.post("/api/transcribe", upload.single('audio'), async (req, res) => {
+  // Transcription-only endpoint (requires auth for Deepgram usage billing)
+  app.post("/api/transcribe", requireAuth('create_notes'), upload.single('audio'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No audio file provided" });
