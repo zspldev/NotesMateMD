@@ -140,10 +140,16 @@ export const employees = pgTable("employees", {
 ```
 
 **Role Values:**
-- `super_admin` - Zapurzaa Systems team (orgid = NULL)
+- `super_admin` - Zapurzaa Systems team (belongs to system org: "Zapurzaa Systems" / ZSPL)
 - `org_admin` - Organization administrators (can have multiple per org)
 - `doctor` - Clinical staff (doctors, nurses, PAs) with full patient access
 - `staff` - Non-clinical staff (front desk, assistants) with basic patient info only
+
+**System Organization (Super Admin):**
+- Org Name: **Zapurzaa Systems**
+- Org Shortname: **ZSPL**
+- Org Number: **1001** (first org in the system)
+- This org is reserved for super admins only
 
 ### Patients Table (Modified)
 
@@ -558,6 +564,7 @@ export const patients = pgTable("patients", {
 6. **Patient Access**: All doctors in org see ALL patients (org-based, not doctor-based)
 7. **Multiple Org Admins**: Allowed per organization
 8. **Impersonation**: Super admins can login as any user
+9. **System Org**: Zapurzaa Systems (ZSPL) - Org #1001, reserved for super admins
 
 ---
 
