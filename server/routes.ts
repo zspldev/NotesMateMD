@@ -518,6 +518,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Org backup export (org_admin or super_admin only)
+  app.get("/api/backups/export", requireAuth(), async (req, res) => {
+    try {
+      const authContext = req.authContext!;
+      const activeRole = authContext.activeRole || authContext.role;
+      
+      // Only org_admin or super_admin can export
+      if (activeRole !== 'org_admin' && authContext.role !== 'super_admin') {
+        return res.status(403).json({ error: "Only organization admins can export data" });
+      }
+      
+      // Determine which org to export
+      let targetOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      // Super admin might pass orgid as query param
+      if (authContext.role === 'super_admin' && req.query.orgid) {
+        targetOrgId = req.query.orgid as string;
+      }
+      
+      if (!targetOrgId) {
+        return res.status(400).json({ error: "No organization specified for export" });
+      }
+      
+      // Get all org data
+      const exportData = await storage.getOrgExportData(targetOrgId);
+      if (!exportData) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Prepare export payload
+      const exportPayload = {
+        exportedAt: new Date().toISOString(),
+        version: "1.0",
+        organization: exportData.organization,
+        patients: exportData.patients,
+        visits: exportData.visits,
+        notes: exportData.notes.map(n => ({
+          ...n,
+          audio_data: n.audio_data ? '[AUDIO_DATA_OMITTED]' : null // Don't include binary audio in export
+        }))
+      };
+      
+      const jsonString = JSON.stringify(exportPayload, null, 2);
+      const fileSizeBytes = Buffer.byteLength(jsonString, 'utf8');
+      
+      // Log the backup
+      await storage.createBackupLog({
+        orgid: targetOrgId,
+        empid: authContext.empid,
+        backup_type: 'full_export',
+        status: 'completed',
+        file_size_bytes: fileSizeBytes,
+        patient_count: exportData.patients.length,
+        visit_count: exportData.visits.length,
+        note_count: exportData.notes.length
+      });
+      
+      // Set headers for file download
+      const filename = `${exportData.organization.org_shortname}_backup_${new Date().toISOString().split('T')[0]}.json`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'application/json');
+      res.send(jsonString);
+      
+      console.log(`Backup exported for org ${exportData.organization.org_shortname} by employee ${authContext.empid}`);
+    } catch (error) {
+      console.error('Backup export error:', error);
+      res.status(500).json({ error: "Failed to export backup" });
+    }
+  });
+
+  // Get backup logs (org_admin sees own org, super_admin sees all)
+  app.get("/api/backups/logs", requireAuth(), async (req, res) => {
+    try {
+      const authContext = req.authContext!;
+      const activeRole = authContext.activeRole || authContext.role;
+      
+      // Super admin can see all logs
+      if (authContext.role === 'super_admin') {
+        const orgid = req.query.orgid as string | undefined;
+        const logs = await storage.getBackupLogs(orgid);
+        return res.json(logs);
+      }
+      
+      // Org admin can only see their org's logs
+      if (activeRole !== 'org_admin') {
+        return res.status(403).json({ error: "Only organization admins can view backup logs" });
+      }
+      
+      const targetOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      if (!targetOrgId) {
+        return res.status(400).json({ error: "No organization context" });
+      }
+      
+      const logs = await storage.getBackupLogs(targetOrgId);
+      res.json(logs);
+    } catch (error) {
+      console.error('Get backup logs error:', error);
+      res.status(500).json({ error: "Failed to get backup logs" });
+    }
+  });
+
   // Create organization (super admin only)
   app.post("/api/organizations", requireAuth(), async (req, res) => {
     try {
