@@ -25,7 +25,8 @@ import {
   Loader2,
   Download,
   X,
-  Shield
+  Shield,
+  ArrowRightLeft
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import PatientSelector from "./PatientSelector";
@@ -627,6 +628,20 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
               </div>
               
               <Separator orientation="vertical" className="h-8" />
+              
+              {/* Show role switch button for dual-role users */}
+              {isOrgAdmin && hasSecondaryRole && (
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onSwitchRole?.(isInAdminView ? 'doctor' : 'org_admin')}
+                  data-testid="button-switch-role"
+                  className="gap-1"
+                >
+                  <ArrowRightLeft className="h-4 w-4" />
+                  {isInAdminView ? 'Clinical View' : 'Admin View'}
+                </Button>
+              )}
               
               <Button 
                 variant="ghost" 

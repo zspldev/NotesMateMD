@@ -363,18 +363,6 @@ export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminD
                   Organization Settings
                   <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
                 </Button>
-                {hasSecondaryRole && (
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="default"
-                    onClick={handleSwitchToDoctor}
-                    style={{ backgroundColor: '#17a2b8' }}
-                    data-testid="button-clinical-mode"
-                  >
-                    <Stethoscope className="h-4 w-4 mr-2" />
-                    Enter Clinical Mode
-                  </Button>
-                )}
               </CardContent>
             </Card>
           </div>

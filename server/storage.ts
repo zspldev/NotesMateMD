@@ -9,7 +9,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
-import { eq, desc, and, ilike, or, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, ilike, or, gte, lte, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
 
 export interface IStorage {
@@ -917,7 +917,7 @@ export class DatabaseStorage implements IStorage {
     const patientIds = orgPatients.map(p => p.patientid);
     const orgVisits = await db.select()
       .from(visits)
-      .where(sql`${visits.patientid} = ANY(${patientIds})`);
+      .where(inArray(visits.patientid, patientIds));
     
     if (orgVisits.length === 0) {
       return { organization: org, patients: orgPatients, visits: [], notes: [] };
@@ -927,7 +927,7 @@ export class DatabaseStorage implements IStorage {
     const visitIds = orgVisits.map(v => v.visitid);
     const orgNotes = await db.select()
       .from(visit_notes)
-      .where(sql`${visit_notes.visitid} = ANY(${visitIds})`);
+      .where(inArray(visit_notes.visitid, visitIds));
     
     return { organization: org, patients: orgPatients, visits: orgVisits, notes: orgNotes };
   }
