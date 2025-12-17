@@ -76,20 +76,28 @@ export class MemStorage implements IStorage {
     // Seed organizations
     const org1: Org = {
       orgid: org1Id,
+      org_number: 1002,
+      org_shortname: "METMED",
       org_name: "Metropolitan Medical Center",
       org_type: "hospital",
       address: "123 Medical Plaza, Healthcare City, HC 12345",
       phone: "(555) 100-2000",
+      mrn_sequence_current: 100001,
+      is_active: true,
       created_at: new Date()
     };
     this.orgs.set(org1.orgid, org1);
 
     const org2: Org = {
       orgid: org2Id, 
+      org_number: 1003,
+      org_shortname: "FAMHLC",
       org_name: "Family Health Clinic",
       org_type: "clinic",
       address: "456 Wellness Ave, Healthtown, HT 67890",
       phone: "(555) 200-3000",
+      mrn_sequence_current: 100001,
+      is_active: true,
       created_at: new Date()
     };
     this.orgs.set(org2.orgid, org2);
@@ -105,6 +113,8 @@ export class MemStorage implements IStorage {
       first_name: "Dr. John",
       last_name: "Smith",
       title: "Primary Care Physician",
+      role: "doctor",
+      is_active: true,
       created_at: new Date()
     };
     this.employees.set(emp1.empid, emp1);
@@ -117,6 +127,8 @@ export class MemStorage implements IStorage {
       first_name: "Dr. Sarah",
       last_name: "Wilson",
       title: "Cardiologist",
+      role: "doctor",
+      is_active: true,
       created_at: new Date()
     };
     this.employees.set(emp2.empid, emp2);
@@ -125,6 +137,7 @@ export class MemStorage implements IStorage {
     const patient1: Patient = {
       patientid: "MRN001234",
       orgid: org1Id,
+      mrn: "001234",
       first_name: "Sarah",
       last_name: "Johnson",
       date_of_birth: "1985-03-15",
@@ -137,6 +150,7 @@ export class MemStorage implements IStorage {
     const patient2: Patient = {
       patientid: "MRN005678",
       orgid: org1Id,
+      mrn: "005678",
       first_name: "Michael", 
       last_name: "Chen",
       date_of_birth: "1979-11-22",
@@ -149,6 +163,7 @@ export class MemStorage implements IStorage {
     const patient3: Patient = {
       patientid: "MRN009876",
       orgid: org1Id,
+      mrn: "009876",
       first_name: "Emma",
       last_name: "Davis", 
       date_of_birth: "1992-07-03",
@@ -241,9 +256,13 @@ export class MemStorage implements IStorage {
     const org: Org = { 
       ...insertOrg, 
       orgid, 
+      org_number: insertOrg.org_number ?? null,
+      org_shortname: insertOrg.org_shortname ?? null,
       org_type: insertOrg.org_type || null,
       address: insertOrg.address || null,
       phone: insertOrg.phone || null,
+      mrn_sequence_current: insertOrg.mrn_sequence_current ?? 100001,
+      is_active: insertOrg.is_active ?? true,
       created_at: new Date() 
     };
     this.orgs.set(orgid, org);
@@ -268,7 +287,10 @@ export class MemStorage implements IStorage {
     const employee: Employee = { 
       ...insertEmployee, 
       empid, 
+      orgid: insertEmployee.orgid ?? null,
       title: insertEmployee.title || null,
+      role: insertEmployee.role ?? 'doctor',
+      is_active: insertEmployee.is_active ?? true,
       created_at: new Date() 
     };
     this.employees.set(empid, employee);
@@ -295,6 +317,7 @@ export class MemStorage implements IStorage {
   async createPatient(insertPatient: InsertPatientWithMRN): Promise<Patient> {
     const patient: Patient = { 
       ...insertPatient, 
+      mrn: insertPatient.mrn ?? null,
       gender: insertPatient.gender || null,
       contact_info: insertPatient.contact_info || null,
       created_at: new Date() 

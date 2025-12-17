@@ -136,6 +136,24 @@ Preferred communication style: Simple, everyday language.
   - Added "Created by" text with Zapurzaa Systems logo image
   - Responsive sizing for mobile devices
 
+- **Enhanced Roles System (Phase 1 - Database Schema)**: Multi-organization role-based access control foundation
+  - **Database Schema Updates**:
+    - `orgs` table: Added `org_number` (unique 4-digit ID starting at 1001), `org_shortname` (6-char max), `mrn_sequence_current` (per-org MRN tracking starting at 100001), `is_active` (soft delete support)
+    - `employees` table: Added `role` (super_admin/org_admin/doctor/staff), `is_active`, made `orgid` nullable for super_admin
+    - `patients` table: Added separate `mrn` field (6-digit numeric extracted from patientid)
+  - **Zapurzaa Systems Organization**: Created ZSPL org (org_number 1001) as system org for super admins
+  - **Super Admin User**: Created `super.admin` account with role='super_admin' (password: simple123)
+  - **Test Organizations**:
+    - METMED (1002): Metropolitan Medical Center
+    - FAMHLC (1003): Family Health Clinic
+  - **Role Definitions** (see `A Proposal for Enhanced Role.md` for full details):
+    - `super_admin`: Platform-wide access, org management, impersonation capability
+    - `org_admin`: Organization settings, employee management, audit logs
+    - `doctor`: Full clinical access, create visits, record notes, view all patients
+    - `staff`: Basic patient info only, no clinical note access
+  - Files: `shared/schema.ts`, `server/storage.ts`, `A Proposal for Enhanced Role.md`
+  - **Next Phase**: Org-based login flow, role-aware UI, permission middleware
+
 ### Known Technical Considerations
 - **Security Enhancement Opportunity**: Currently, the backend accepts orgid from client request body. Future improvement should derive orgid from authenticated session to prevent potential tampering.
 - **MRN Sequence Management**: The `mrn_sequence` must exist in all deployment environments. Monitor logs for MRN creation errors to catch misconfigured sequences early.

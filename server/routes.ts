@@ -84,8 +84,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
-      // Get organization info
-      const org = await storage.getOrg(employee.orgid);
+      // Get organization info (may be null for super_admin)
+      const org = employee.orgid ? await storage.getOrg(employee.orgid) : null;
       
       // Return employee info without password hash
       const { password_hash, ...employeeData } = employee;
