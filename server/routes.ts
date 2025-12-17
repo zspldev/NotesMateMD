@@ -623,9 +623,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orgid: effectiveOrgId  // Use org from token, not from request body
       });
       
-      // Auto-generate MRN using database sequence
-      const result = await db.execute(sql`SELECT nextval('mrn_sequence')`);
-      const mrnNumber = result.rows[0].nextval;
+      // Get org's current MRN sequence
+      const org = await storage.getOrg(effectiveOrgId);
+      if (!org) {
+        return res.status(400).json({ error: "Organization not found" });
+      }
+      
+      // Use org's MRN sequence (6-digit starting at 100001)
+      const mrnNumber = org.mrn_sequence_current || 100001;
       const patientid = `MRN${mrnNumber}`;
       
       // Create patient with auto-generated MRN
@@ -635,6 +640,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const patient = await storage.createPatient(patientWithMRN);
+      
+      // Increment org's MRN sequence for next patient
+      await storage.updateOrg(effectiveOrgId, { mrn_sequence_current: mrnNumber + 1 });
       
       res.status(201).json(patient);
     } catch (error) {
