@@ -9,9 +9,13 @@ import {
   Shield,
   LogIn,
   RefreshCw,
-  Loader2
+  Loader2,
+  Plus,
+  Pencil
 } from "lucide-react";
 import { api, type LoginResponse } from "../lib/api";
+import AddOrganizationDialog from "./AddOrganizationDialog";
+import EditOrganizationDialog from "./EditOrganizationDialog";
 
 interface SuperAdminDashboardProps {
   loginData: LoginResponse;
@@ -31,6 +35,9 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
 
   useEffect(() => {
     loadOrganizations();
@@ -52,6 +59,22 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
 
   const handleLoginToOrg = (orgNumber: number) => {
     onSwitchOrg(orgNumber.toString());
+  };
+
+  const handleEditOrg = (org: Organization) => {
+    setSelectedOrg(org);
+    setShowEditDialog(true);
+  };
+
+  const getOrgTypeLabel = (type: string | null) => {
+    switch (type) {
+      case 'hospital': return 'Hospital';
+      case 'clinic': return 'Clinic';
+      case 'medical_office': return 'Medical Office';
+      case 'urgent_care': return 'Urgent Care';
+      case 'specialty': return 'Specialty Practice';
+      default: return type || 'Unknown';
+    }
   };
 
   return (
@@ -113,25 +136,34 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="h-5 w-5" />
                 Organizations
               </CardTitle>
               <CardDescription>
-                Login to an organization to access its patients and clinical data
+                Manage organizations and access their clinical data
               </CardDescription>
             </div>
-            <Button 
-              variant="outline" 
-              size="icon"
-              onClick={loadOrganizations}
-              disabled={isLoading}
-              data-testid="button-refresh-orgs"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={loadOrganizations}
+                disabled={isLoading}
+                data-testid="button-refresh-orgs"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button 
+                onClick={() => setShowAddDialog(true)}
+                data-testid="button-add-org"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Organization
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -145,7 +177,7 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
             </div>
           ) : organizations.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No organizations found
+              No organizations found. Click "Add Organization" to create one.
             </div>
           ) : (
             <div className="space-y-3">
@@ -162,14 +194,22 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
                     <div>
                       <div className="font-medium">{org.org_name}</div>
                       <div className="text-sm text-muted-foreground">
-                        Code: {org.org_number} • {org.org_shortname}
+                        Code: {org.org_number} • {org.org_shortname} • {getOrgTypeLabel(org.org_type)}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <Badge variant={org.is_active ? "default" : "secondary"}>
                       {org.is_active ? "Active" : "Inactive"}
                     </Badge>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleEditOrg(org)}
+                      data-testid={`button-edit-org-${org.org_number}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <Button
                       size="sm"
                       onClick={() => org.org_number && handleLoginToOrg(org.org_number)}
@@ -196,12 +236,17 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
-            <Button variant="outline" className="h-auto py-4 flex flex-col items-start" disabled>
+            <Button 
+              variant="outline" 
+              className="h-auto py-4 flex flex-col items-start"
+              onClick={() => setShowAddDialog(true)}
+              data-testid="button-quick-add-org"
+            >
               <div className="flex items-center gap-2 font-medium">
                 <Building2 className="h-4 w-4" />
                 Create Organization
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Coming soon</p>
+              <p className="text-xs text-muted-foreground mt-1">Add a new medical organization</p>
             </Button>
             <Button variant="outline" className="h-auto py-4 flex flex-col items-start" disabled>
               <div className="flex items-center gap-2 font-medium">
@@ -213,6 +258,19 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
           </div>
         </CardContent>
       </Card>
+
+      <AddOrganizationDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        onSuccess={loadOrganizations}
+      />
+
+      <EditOrganizationDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        organization={selectedOrg}
+        onSuccess={loadOrganizations}
+      />
     </div>
   );
 }

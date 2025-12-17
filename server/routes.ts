@@ -9,6 +9,7 @@ import {
   type InsertPatientWithMRN
 } from "@shared/schema";
 import multer from "multer";
+import bcrypt from "bcrypt";
 import { transcriptionService, type TranscriptionResult, type TranscriptionError } from "./transcription";
 import { 
   formatTranscriptionToTemplate, 
@@ -405,6 +406,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(org);
     } catch (error) {
       console.error('Get organization error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get next available org number (super admin only)
+  app.get("/api/organizations-next-number", requireAuth(), async (req, res) => {
+    try {
+      const authContext = req.authContext!;
+      
+      if (authContext.role !== 'super_admin') {
+        return res.status(403).json({ error: "Only super admins can access this" });
+      }
+      
+      const nextNumber = await storage.getNextOrgNumber();
+      res.json({ nextOrgNumber: nextNumber });
+    } catch (error) {
+      console.error('Get next org number error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Create organization (super admin only)
+  app.post("/api/organizations", requireAuth(), async (req, res) => {
+    try {
+      const authContext = req.authContext!;
+      
+      if (authContext.role !== 'super_admin') {
+        return res.status(403).json({ error: "Only super admins can create organizations" });
+      }
+      
+      const { org_shortname, org_name, org_type, address, phone, admin_username, admin_password, admin_first_name, admin_last_name } = req.body;
+      
+      // Validate required fields
+      if (!org_shortname || !org_name) {
+        return res.status(400).json({ error: "Organization shortname and name are required" });
+      }
+      
+      // Validate shortname format (max 6 chars, alphanumeric)
+      if (!/^[A-Z0-9]{1,6}$/i.test(org_shortname)) {
+        return res.status(400).json({ error: "Shortname must be 1-6 alphanumeric characters" });
+      }
+      
+      // Check if shortname already exists
+      const existingOrg = await storage.getOrgByShortname(org_shortname);
+      if (existingOrg) {
+        return res.status(400).json({ error: "Organization shortname already exists" });
+      }
+      
+      // Validate admin info before creating org (to avoid orphaned orgs)
+      const hasAdminInfo = admin_username || admin_password || admin_first_name || admin_last_name;
+      if (hasAdminInfo) {
+        // Require all admin fields if any are provided
+        if (!admin_username || !admin_password || !admin_first_name || !admin_last_name) {
+          return res.status(400).json({ error: "All admin fields (username, password, first name, last name) are required" });
+        }
+        
+        // Check if admin username already exists BEFORE creating org
+        const existingEmployee = await storage.getEmployeeByUsername(admin_username);
+        if (existingEmployee) {
+          return res.status(400).json({ error: "Admin username already exists" });
+        }
+      }
+      
+      // Get next org number
+      const nextOrgNumber = await storage.getNextOrgNumber();
+      
+      // Create the organization
+      const newOrg = await storage.createOrg({
+        org_number: nextOrgNumber,
+        org_shortname: org_shortname.toUpperCase(),
+        org_name,
+        org_type: org_type || 'clinic',
+        address: address || null,
+        phone: phone || null,
+        mrn_sequence_current: 100001,
+        is_active: true
+      });
+      
+      // If admin credentials provided, create the first org admin
+      let firstAdmin = null;
+      if (hasAdminInfo) {
+        const passwordHash = await bcrypt.hash(admin_password, 10);
+        firstAdmin = await storage.createEmployee({
+          orgid: newOrg.orgid,
+          username: admin_username,
+          password_hash: passwordHash,
+          first_name: admin_first_name,
+          last_name: admin_last_name,
+          title: 'Organization Administrator',
+          role: 'org_admin',
+          is_active: true
+        });
+        
+        // Remove password_hash from response
+        const { password_hash, ...adminData } = firstAdmin;
+        firstAdmin = adminData;
+      }
+      
+      console.log(`Super admin ${authContext.empid} created organization: ${newOrg.org_name} (${newOrg.org_number})`);
+      
+      res.status(201).json({ organization: newOrg, admin: firstAdmin });
+    } catch (error) {
+      console.error('Create organization error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Update organization (super admin only)
+  app.patch("/api/organizations/:orgid", requireAuth(), async (req, res) => {
+    try {
+      const { orgid } = req.params;
+      const authContext = req.authContext!;
+      
+      if (authContext.role !== 'super_admin') {
+        return res.status(403).json({ error: "Only super admins can update organizations" });
+      }
+      
+      const existingOrg = await storage.getOrg(orgid);
+      if (!existingOrg) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      const { org_name, org_type, address, phone, is_active } = req.body;
+      
+      // Build updates object with only provided fields
+      const updates: Record<string, any> = {};
+      if (org_name !== undefined) updates.org_name = org_name;
+      if (org_type !== undefined) updates.org_type = org_type;
+      if (address !== undefined) updates.address = address;
+      if (phone !== undefined) updates.phone = phone;
+      if (is_active !== undefined) updates.is_active = is_active;
+      
+      const updatedOrg = await storage.updateOrg(orgid, updates);
+      
+      console.log(`Super admin ${authContext.empid} updated organization: ${updatedOrg?.org_name} (${updatedOrg?.org_number})`);
+      
+      res.json(updatedOrg);
+    } catch (error) {
+      console.error('Update organization error:', error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

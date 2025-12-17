@@ -192,6 +192,40 @@ class ApiClient {
     return this.request('/organizations');
   }
 
+  async getNextOrgNumber(): Promise<{ nextOrgNumber: number }> {
+    return this.request('/organizations-next-number');
+  }
+
+  async createOrganization(data: {
+    org_shortname: string;
+    org_name: string;
+    org_type?: string;
+    address?: string;
+    phone?: string;
+    admin_username?: string;
+    admin_password?: string;
+    admin_first_name?: string;
+    admin_last_name?: string;
+  }): Promise<{ organization: any; admin: any | null }> {
+    return this.request('/organizations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateOrganization(orgid: string, updates: {
+    org_name?: string;
+    org_type?: string;
+    address?: string;
+    phone?: string;
+    is_active?: boolean;
+  }): Promise<any> {
+    return this.request(`/organizations/${orgid}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
   // Patients
   async getPatients(orgid: string, search?: string): Promise<Patient[]> {
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';

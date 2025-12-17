@@ -16,7 +16,10 @@ export interface IStorage {
   getOrgs(): Promise<Org[]>;
   getOrg(orgid: string): Promise<Org | undefined>;
   getOrgByOrgNumber(orgNumber: number): Promise<Org | undefined>;
+  getOrgByShortname(shortname: string): Promise<Org | undefined>;
+  getNextOrgNumber(): Promise<number>;
   createOrg(org: InsertOrg): Promise<Org>;
+  updateOrg(orgid: string, updates: Partial<InsertOrg>): Promise<Org | undefined>;
 
   // Employee operations
   getEmployees(orgid: string): Promise<Employee[]>;
@@ -256,6 +259,18 @@ export class MemStorage implements IStorage {
     return Array.from(this.orgs.values()).find(org => org.org_number === orgNumber);
   }
 
+  async getOrgByShortname(shortname: string): Promise<Org | undefined> {
+    return Array.from(this.orgs.values()).find(org => org.org_shortname?.toUpperCase() === shortname.toUpperCase());
+  }
+
+  async getNextOrgNumber(): Promise<number> {
+    const allOrgs = Array.from(this.orgs.values());
+    const maxOrgNumber = allOrgs.reduce((max, org) => {
+      return (org.org_number && org.org_number > max) ? org.org_number : max;
+    }, 1000);
+    return maxOrgNumber + 1;
+  }
+
   async createOrg(insertOrg: InsertOrg): Promise<Org> {
     const orgid = randomUUID();
     const org: Org = { 
@@ -272,6 +287,15 @@ export class MemStorage implements IStorage {
     };
     this.orgs.set(orgid, org);
     return org;
+  }
+
+  async updateOrg(orgid: string, updates: Partial<InsertOrg>): Promise<Org | undefined> {
+    const org = this.orgs.get(orgid);
+    if (!org) return undefined;
+    
+    const updatedOrg: Org = { ...org, ...updates };
+    this.orgs.set(orgid, updatedOrg);
+    return updatedOrg;
   }
 
   // Employee methods
@@ -504,8 +528,28 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getOrgByShortname(shortname: string): Promise<Org | undefined> {
+    const result = await db.select().from(orgs).where(
+      sql`UPPER(${orgs.org_shortname}) = UPPER(${shortname})`
+    );
+    return result[0];
+  }
+
+  async getNextOrgNumber(): Promise<number> {
+    const result = await db.select({ maxNum: sql<number>`COALESCE(MAX(${orgs.org_number}), 1000)` }).from(orgs);
+    return (result[0]?.maxNum || 1000) + 1;
+  }
+
   async createOrg(insertOrg: InsertOrg): Promise<Org> {
     const result = await db.insert(orgs).values(insertOrg).returning();
+    return result[0];
+  }
+
+  async updateOrg(orgid: string, updates: Partial<InsertOrg>): Promise<Org | undefined> {
+    const result = await db.update(orgs)
+      .set(updates)
+      .where(eq(orgs.orgid, orgid))
+      .returning();
     return result[0];
   }
 
