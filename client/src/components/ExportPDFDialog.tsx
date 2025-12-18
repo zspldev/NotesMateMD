@@ -76,8 +76,8 @@ export default function ExportPDFDialog({
       const startStr = formatDateForAPI(startDate);
       const endStr = formatDateForAPI(endDate);
       
-      // Get auth token from localStorage
-      const token = localStorage.getItem('accessToken');
+      // Get auth token from sessionStorage (matches api.ts storage)
+      const token = sessionStorage.getItem('notesmate_access_token');
       
       const response = await fetch(
         `/api/patients/${patientId}/notes/export?startDate=${startStr}&endDate=${endStr}`,
