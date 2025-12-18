@@ -5,7 +5,8 @@ import {
   type Visit, type InsertVisit,
   type VisitNote, type InsertVisitNote,
   type BackupLog, type InsertBackupLog,
-  orgs, employees, patients, visits, visit_notes, backup_logs
+  type VisitDocument, type InsertVisitDocument,
+  orgs, employees, patients, visits, visit_notes, backup_logs, visit_documents
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
@@ -79,6 +80,12 @@ export interface IStorage {
     visits: Visit[];
     notes: VisitNote[];
   } | null>;
+  
+  // Visit document operations
+  getVisitDocuments(visitid: string): Promise<VisitDocument[]>;
+  getVisitDocument(documentId: string): Promise<VisitDocument | undefined>;
+  createVisitDocument(doc: InsertVisitDocument): Promise<VisitDocument>;
+  deleteVisitDocument(documentId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -603,6 +610,20 @@ export class MemStorage implements IStorage {
     
     return { organization: org, patients: orgPatients, visits: orgVisits, notes: orgNotes };
   }
+  
+  // Visit document stubs (not used in MemStorage)
+  async getVisitDocuments(visitid: string): Promise<VisitDocument[]> {
+    return [];
+  }
+  async getVisitDocument(documentId: string): Promise<VisitDocument | undefined> {
+    return undefined;
+  }
+  async createVisitDocument(doc: InsertVisitDocument): Promise<VisitDocument> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async deleteVisitDocument(documentId: string): Promise<boolean> {
+    return false;
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -930,6 +951,37 @@ export class DatabaseStorage implements IStorage {
       .where(inArray(visit_notes.visitid, visitIds));
     
     return { organization: org, patients: orgPatients, visits: orgVisits, notes: orgNotes };
+  }
+  
+  // Visit document operations
+  async getVisitDocuments(visitid: string): Promise<VisitDocument[]> {
+    return await db.select()
+      .from(visit_documents)
+      .where(and(
+        eq(visit_documents.visitid, visitid),
+        eq(visit_documents.is_deleted, false)
+      ))
+      .orderBy(desc(visit_documents.created_at));
+  }
+  
+  async getVisitDocument(documentId: string): Promise<VisitDocument | undefined> {
+    const result = await db.select()
+      .from(visit_documents)
+      .where(eq(visit_documents.document_id, documentId));
+    return result[0];
+  }
+  
+  async createVisitDocument(doc: InsertVisitDocument): Promise<VisitDocument> {
+    const result = await db.insert(visit_documents).values(doc).returning();
+    return result[0];
+  }
+  
+  async deleteVisitDocument(documentId: string): Promise<boolean> {
+    const result = await db.update(visit_documents)
+      .set({ is_deleted: true })
+      .where(eq(visit_documents.document_id, documentId))
+      .returning();
+    return result.length > 0;
   }
 }
 

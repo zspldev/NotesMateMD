@@ -110,6 +110,24 @@ export const backup_logs = pgTable("backup_logs", {
   createdByIdx: index("backup_logs_created_by_idx").on(table.created_by_empid),
 }));
 
+// Visit documents table - stores metadata for uploaded patient documents
+export const visit_documents = pgTable("visit_documents", {
+  document_id: uuid("document_id").primaryKey().default(sql`gen_random_uuid()`),
+  visitid: uuid("visitid").references(() => visits.visitid).notNull(),
+  orgid: uuid("orgid").references(() => orgs.orgid).notNull(), // Denormalized for multi-tenant filtering
+  uploaded_by_empid: uuid("uploaded_by_empid").references(() => employees.empid).notNull(),
+  original_filename: varchar("original_filename", { length: 255 }).notNull(),
+  storage_key: text("storage_key").notNull(), // Path in object storage
+  mime_type: varchar("mime_type", { length: 100 }).notNull(),
+  file_size_bytes: integer("file_size_bytes").notNull(),
+  description: text("description"), // Optional description/notes about the document
+  is_deleted: boolean("is_deleted").default(false), // Soft delete flag
+  created_at: timestamp("created_at").default(sql`now()`),
+}, (table) => ({
+  visitidIdx: index("visit_documents_visitid_idx").on(table.visitid),
+  orgidIdx: index("visit_documents_orgid_idx").on(table.orgid),
+}));
+
 // Insert schemas
 export const insertOrgSchema = createInsertSchema(orgs).omit({
   orgid: true,
@@ -149,6 +167,11 @@ export const insertBackupLogSchema = createInsertSchema(backup_logs).omit({
   created_at: true,
 });
 
+export const insertVisitDocumentSchema = createInsertSchema(visit_documents).omit({
+  document_id: true,
+  created_at: true,
+});
+
 // Types
 export type InsertOrg = z.infer<typeof insertOrgSchema>;
 export type Org = typeof orgs.$inferSelect;
@@ -168,6 +191,9 @@ export type VisitNote = typeof visit_notes.$inferSelect;
 
 export type InsertBackupLog = z.infer<typeof insertBackupLogSchema>;
 export type BackupLog = typeof backup_logs.$inferSelect;
+
+export type InsertVisitDocument = z.infer<typeof insertVisitDocumentSchema>;
+export type VisitDocument = typeof visit_documents.$inferSelect;
 
 // Legacy user schema for compatibility
 export const users = pgTable("users", {
