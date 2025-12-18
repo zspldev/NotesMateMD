@@ -10,6 +10,7 @@ import {
 } from "@shared/schema";
 import multer from "multer";
 import bcrypt from "bcrypt";
+import { Client as ObjectStorageClient } from "@replit/object-storage";
 import { transcriptionService, type TranscriptionResult, type TranscriptionError } from "./transcription";
 import { 
   formatTranscriptionToTemplate, 
@@ -131,6 +132,35 @@ const upload = multer({
     }
   }
 });
+
+// Configure multer for document uploads (PDFs, images, common document types)
+const ALLOWED_DOCUMENT_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain'
+];
+
+const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB limit for documents
+  },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_DOCUMENT_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Allowed: PDF, images (JPG, PNG, GIF, WebP), Word documents, text files'));
+    }
+  }
+});
+
+// Initialize object storage client
+const objectStorage = new ObjectStorageClient();
 
 // Helper function to detect database connection errors
 function isDatabaseConnectionError(error: any): boolean {
@@ -1274,6 +1304,177 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.send(audioBuffer);
     } catch (error) {
       console.error('Download audio error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Visit Documents routes
+  
+  // List documents for a visit
+  app.get("/api/visits/:visitid/documents", requireAuth('view_notes'), async (req, res) => {
+    try {
+      const { visitid } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      // Verify visit's patient belongs to user's org
+      const visit = await storage.getVisit(visitid);
+      if (!visit) {
+        return res.status(404).json({ error: "Visit not found" });
+      }
+      
+      const patient = await storage.getPatient(visit.patientid);
+      if (effectiveOrgId && patient && patient.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: visit not in your organization" });
+      }
+      
+      const documents = await storage.getVisitDocuments(visitid);
+      res.json(documents);
+    } catch (error) {
+      console.error('Get visit documents error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
+  // Upload document to a visit
+  app.post("/api/visits/:visitid/documents", requireAuth('create_notes'), documentUpload.single('document'), async (req, res) => {
+    try {
+      const { visitid } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      // Verify visit's patient belongs to user's org
+      const visit = await storage.getVisit(visitid);
+      if (!visit) {
+        return res.status(404).json({ error: "Visit not found" });
+      }
+      
+      const patient = await storage.getPatient(visit.patientid);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      if (effectiveOrgId && patient.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: cannot upload document to visit outside your organization" });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ error: "No document file provided" });
+      }
+      
+      // Generate storage key: org/{orgid}/patients/{patientid}/visits/{visitid}/documents/{uuid}_{filename}
+      const documentId = crypto.randomUUID();
+      const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const storageKey = `${process.env.PRIVATE_OBJECT_DIR}/org/${patient.orgid}/patients/${patient.patientid}/visits/${visitid}/documents/${documentId}_${safeFilename}`;
+      
+      // Upload to object storage
+      await objectStorage.uploadFromBytes(storageKey, req.file.buffer);
+      
+      // Create database record
+      const documentRecord = await storage.createVisitDocument({
+        visitid,
+        orgid: patient.orgid,
+        uploaded_by_empid: authContext.empid,
+        original_filename: req.file.originalname,
+        storage_key: storageKey,
+        mime_type: req.file.mimetype,
+        file_size_bytes: req.file.size,
+        description: req.body.description || null,
+        is_deleted: false
+      });
+      
+      console.log(`Document uploaded: ${documentRecord.document_id} by employee ${authContext.empid}`);
+      
+      res.status(201).json(documentRecord);
+    } catch (error) {
+      console.error('Upload document error:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload document" });
+    }
+  });
+  
+  // Get document metadata
+  app.get("/api/documents/:documentId", requireAuth('view_notes'), async (req, res) => {
+    try {
+      const { documentId } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      const document = await storage.getVisitDocument(documentId);
+      if (!document || document.is_deleted) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Verify document belongs to user's org
+      if (effectiveOrgId && document.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: document not in your organization" });
+      }
+      
+      res.json(document);
+    } catch (error) {
+      console.error('Get document error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
+  // Download document file
+  app.get("/api/documents/:documentId/download", requireAuth('view_notes'), async (req, res) => {
+    try {
+      const { documentId } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      const document = await storage.getVisitDocument(documentId);
+      if (!document || document.is_deleted) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Verify document belongs to user's org
+      if (effectiveOrgId && document.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: document not in your organization" });
+      }
+      
+      // Download from object storage
+      const { ok, value: fileBuffer } = await objectStorage.downloadAsBytes(document.storage_key);
+      
+      if (!ok || !fileBuffer) {
+        return res.status(404).json({ error: "Document file not found in storage" });
+      }
+      
+      res.setHeader('Content-Type', document.mime_type);
+      res.setHeader('Content-Disposition', `attachment; filename="${document.original_filename}"`);
+      res.setHeader('Content-Length', document.file_size_bytes.toString());
+      res.send(Buffer.from(fileBuffer));
+    } catch (error) {
+      console.error('Download document error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
+  // Delete document (soft delete)
+  app.delete("/api/documents/:documentId", requireAuth('manage_notes'), async (req, res) => {
+    try {
+      const { documentId } = req.params;
+      const authContext = req.authContext!;
+      const effectiveOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      const document = await storage.getVisitDocument(documentId);
+      if (!document || document.is_deleted) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Verify document belongs to user's org
+      if (effectiveOrgId && document.orgid !== effectiveOrgId) {
+        return res.status(403).json({ error: "Access denied: cannot delete document outside your organization" });
+      }
+      
+      const deleted = await storage.deleteVisitDocument(documentId);
+      if (deleted) {
+        console.log(`Document soft-deleted: ${documentId} by employee ${authContext.empid}`);
+        res.json({ success: true, message: "Document deleted" });
+      } else {
+        res.status(500).json({ error: "Failed to delete document" });
+      }
+    } catch (error) {
+      console.error('Delete document error:', error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
