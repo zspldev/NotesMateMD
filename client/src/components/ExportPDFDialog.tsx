@@ -76,8 +76,14 @@ export default function ExportPDFDialog({
       const startStr = formatDateForAPI(startDate);
       const endStr = formatDateForAPI(endDate);
       
+      // Get auth token from localStorage
+      const token = localStorage.getItem('accessToken');
+      
       const response = await fetch(
-        `/api/patients/${patientId}/notes/export?startDate=${startStr}&endDate=${endStr}`
+        `/api/patients/${patientId}/notes/export?startDate=${startStr}&endDate=${endStr}`,
+        {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        }
       );
       
       if (!response.ok) {
