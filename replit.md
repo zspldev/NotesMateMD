@@ -48,6 +48,7 @@ Preferred communication style: Simple, everyday language.
 - **AI Auto-Format**: Integrates OpenAI for reorganizing transcribed text into selected templates.
 - **Quick Insert & Abbreviation Expansion**: For common medical phrases and terms.
 - **Patient Management**: Create, edit, delete patients; auto-assigned Medical Record Numbers (MRN).
+- **Visit Document Uploads**: Attach PDFs, images, and documents to patient visits using Replit Object Storage. Documents are stored securely with org-scoped access controls and HIPAA-compliant hierarchical paths.
 - **PDF Export**: Export clinical notes with date range selection and professional formatting.
 - **Audio Playback Fix**: Byte-level audio format detection for cross-platform (especially iOS) compatibility.
 - **Audit Trail**: Tracks device, browser, IP address, and user agent for note creation.
@@ -67,3 +68,4 @@ Preferred communication style: Simple, everyday language.
 - **Development Tools**: ESBuild, TSX
 - **Deployment**: Replit-optimized
 - **AI Integration**: Replit AI Integrations (for OpenAI access)
+- **Object Storage**: Replit Object Storage (@replit/object-storage) for secure document uploads
