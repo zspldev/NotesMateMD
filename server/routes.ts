@@ -159,8 +159,19 @@ const documentUpload = multer({
   }
 });
 
-// Initialize object storage client
-const objectStorage = new ObjectStorageClient();
+// Initialize object storage client - lazy initialization
+let objectStorageClient: ObjectStorageClient | null = null;
+
+function getObjectStorage(): ObjectStorageClient {
+  if (!objectStorageClient) {
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    if (!bucketId) {
+      throw new Error('Object storage is not configured. Please set up a storage bucket.');
+    }
+    objectStorageClient = new ObjectStorageClient({ bucketId });
+  }
+  return objectStorageClient;
+}
 
 // Helper function to detect database connection errors
 function isDatabaseConnectionError(error: any): boolean {
@@ -1367,6 +1378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const storageKey = `${process.env.PRIVATE_OBJECT_DIR}/org/${patient.orgid}/patients/${patient.patientid}/visits/${visitid}/documents/${documentId}_${safeFilename}`;
       
       // Upload to object storage
+      const objectStorage = getObjectStorage();
       await objectStorage.uploadFromBytes(storageKey, req.file.buffer);
       
       // Create database record
@@ -1433,6 +1445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Download from object storage
+      const objectStorage = getObjectStorage();
       const { ok, value: fileBuffer } = await objectStorage.downloadAsBytes(document.storage_key);
       
       if (!ok || !fileBuffer) {

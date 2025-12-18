@@ -32,6 +32,7 @@ import { useTheme } from "./ThemeProvider";
 import PatientSelector from "./PatientSelector";
 import VisitHistory from "./VisitHistory";
 import AudioRecorder from "./AudioRecorder";
+import VisitDocuments from "./VisitDocuments";
 import NewPatientDialog from "./NewPatientDialog";
 import ExportPDFDialog from "./ExportPDFDialog";
 import SuperAdminDashboard from "./SuperAdminDashboard";
@@ -544,6 +545,10 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
               existingTranscription={latestSavedNote?.transcription_text || undefined}
               onUnsavedChanges={setHasUnsavedChanges}
             />
+            
+            {currentVisit?.visitId && (
+              <VisitDocuments visitId={currentVisit.visitId} />
+            )}
           </div>
         );
       
