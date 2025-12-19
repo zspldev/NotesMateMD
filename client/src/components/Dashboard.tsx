@@ -68,6 +68,7 @@ interface UIVisit {
   employeeName: string;
   employeeTitle: string;
   notes: UINote[];
+  documentCount?: number;
 }
 
 interface UINote {
@@ -153,6 +154,7 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
     visitPurpose: visit.visit_purpose || '',
     employeeName: visit.employeeName || 'Unknown',
     employeeTitle: visit.employeeTitle || 'Unknown',
+    documentCount: visit.document_count || 0,
     notes: (visit.notes || []).map(note => {
       // Explicitly convert boolean fields to handle undefined/null
       const aiTranscribed = note.ai_transcribed === true;

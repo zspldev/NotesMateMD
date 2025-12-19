@@ -2,8 +2,10 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, FileText, Play, Pause, User, Bot, Monitor, Smartphone, Tablet, Globe } from "lucide-react";
+import { Calendar, Clock, FileText, Play, Pause, User, Bot, Monitor, Smartphone, Tablet, Globe, Paperclip } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import VisitDocuments from "./VisitDocuments";
 
 interface VisitNote {
   noteId: string;
@@ -30,6 +32,7 @@ interface Visit {
   employeeName: string;
   employeeTitle: string;
   notes: VisitNote[];
+  documentCount?: number;
 }
 
 interface VisitHistoryProps {
@@ -45,6 +48,7 @@ interface FlatNote extends VisitNote {
   visitPurpose?: string;
   employeeName: string;
   employeeTitle: string;
+  documentCount?: number;
 }
 
 export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientName }: VisitHistoryProps) {
@@ -64,7 +68,8 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
           visitDate: visit.visitDate,
           visitPurpose: visit.visitPurpose,
           employeeName: visit.employeeName,
-          employeeTitle: visit.employeeTitle
+          employeeTitle: visit.employeeTitle,
+          documentCount: visit.documentCount
         });
       });
     });
@@ -326,6 +331,36 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
                     </>
                   )}
                 </div>
+
+                {/* Document Indicator and View Documents Button */}
+                {(note.documentCount && note.documentCount > 0) && (
+                  <div className="flex items-center gap-2">
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                          data-testid={`button-view-documents-${note.visitId}`}
+                        >
+                          <Paperclip className="h-4 w-4" />
+                          <span>Documents</span>
+                          <Badge variant="secondary" className="ml-1" data-testid={`badge-doc-count-${note.visitId}`}>
+                            {note.documentCount}
+                          </Badge>
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent className="sm:max-w-md overflow-y-auto">
+                        <SheetHeader>
+                          <SheetTitle>Visit Documents</SheetTitle>
+                        </SheetHeader>
+                        <div className="mt-4">
+                          <VisitDocuments visitId={note.visitId} readOnly />
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                  </div>
+                )}
 
                 {/* Device/Browser Tracking Info - Only shows device type and browser (non-sensitive) */}
                 {(note.deviceType || note.browserName) && (

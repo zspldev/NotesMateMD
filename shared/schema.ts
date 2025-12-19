@@ -186,6 +186,11 @@ export type Patient = typeof patients.$inferSelect;
 export type InsertVisit = z.infer<typeof insertVisitSchema>;
 export type Visit = typeof visits.$inferSelect;
 
+// Extended Visit type that includes document count for visit history display
+export type VisitWithDocCount = Visit & {
+  document_count: number;
+};
+
 export type InsertVisitNote = z.infer<typeof insertVisitNoteSchema>;
 export type VisitNote = typeof visit_notes.$inferSelect;
 

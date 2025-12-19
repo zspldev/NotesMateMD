@@ -57,6 +57,7 @@ export interface Visit {
   employeeName?: string;
   employeeTitle?: string;
   notes?: VisitNote[];
+  document_count?: number;
 }
 
 export interface VisitNote {

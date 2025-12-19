@@ -2,7 +2,7 @@ import {
   type Org, type InsertOrg,
   type Employee, type InsertEmployee,
   type Patient, type InsertPatient, type InsertPatientWithMRN,
-  type Visit, type InsertVisit,
+  type Visit, type InsertVisit, type VisitWithDocCount,
   type VisitNote, type InsertVisitNote,
   type BackupLog, type InsertBackupLog,
   type VisitDocument, type InsertVisitDocument,
@@ -39,7 +39,7 @@ export interface IStorage {
   searchPatients(orgid: string, query: string): Promise<Patient[]>;
 
   // Visit operations
-  getVisits(patientid: string): Promise<Visit[]>;
+  getVisits(patientid: string): Promise<VisitWithDocCount[]>;
   getVisit(visitid: string): Promise<Visit | undefined>;
   createVisit(visit: InsertVisit): Promise<Visit>;
 
@@ -428,10 +428,11 @@ export class MemStorage implements IStorage {
   }
 
   // Visit methods
-  async getVisits(patientid: string): Promise<Visit[]> {
-    return Array.from(this.visits.values())
+  async getVisits(patientid: string): Promise<VisitWithDocCount[]> {
+    const visitsArray = Array.from(this.visits.values())
       .filter(visit => visit.patientid === patientid)
       .sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
+    return visitsArray.map(v => ({ ...v, document_count: 0 }));
   }
 
   async getVisit(visitid: string): Promise<Visit | undefined> {
@@ -760,11 +761,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Visit methods
-  async getVisits(patientid: string): Promise<Visit[]> {
-    return await db.select()
+  async getVisits(patientid: string): Promise<VisitWithDocCount[]> {
+    // Get visits with document count using a subquery
+    const result = await db.select({
+      visitid: visits.visitid,
+      patientid: visits.patientid,
+      empid: visits.empid,
+      visit_date: visits.visit_date,
+      visit_purpose: visits.visit_purpose,
+      created_at: visits.created_at,
+      document_count: sql<number>`COALESCE((
+        SELECT COUNT(*)::int 
+        FROM visit_documents 
+        WHERE visit_documents.visit_id = ${visits.visitid} 
+        AND visit_documents.is_deleted = false
+      ), 0)`.as('document_count')
+    })
       .from(visits)
       .where(eq(visits.patientid, patientid))
       .orderBy(desc(visits.visit_date));
+    
+    return result;
   }
 
   async getVisit(visitid: string): Promise<Visit | undefined> {

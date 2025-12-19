@@ -24,6 +24,7 @@ import type { VisitDocument } from '@shared/schema';
 
 interface VisitDocumentsProps {
   visitId: string;
+  readOnly?: boolean;
 }
 
 const FILE_TYPE_ICONS: Record<string, typeof FileText> = {
@@ -41,7 +42,7 @@ const formatFileSize = (bytes: number): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-export default function VisitDocuments({ visitId }: VisitDocumentsProps) {
+export default function VisitDocuments({ visitId, readOnly = false }: VisitDocumentsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -247,16 +248,18 @@ export default function VisitDocuments({ visitId }: VisitDocumentsProps) {
               </Badge>
             )}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            data-testid="button-add-document"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add
-          </Button>
+          {!readOnly && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              data-testid="button-add-document"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -269,7 +272,7 @@ export default function VisitDocuments({ visitId }: VisitDocumentsProps) {
           data-testid="input-file-upload"
         />
 
-        {showUploadForm && selectedFile && (
+        {!readOnly && showUploadForm && selectedFile && (
           <div className="border rounded-md p-4 space-y-3 bg-muted/30" data-testid="form-upload">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
@@ -375,19 +378,21 @@ export default function VisitDocuments({ visitId }: VisitDocumentsProps) {
                       <Download className="h-4 w-4" />
                     )}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(doc.document_id)}
-                    disabled={deletingId === doc.document_id}
-                    data-testid={`button-delete-${doc.document_id}`}
-                  >
-                    {deletingId === doc.document_id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    )}
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(doc.document_id)}
+                      disabled={deletingId === doc.document_id}
+                      data-testid={`button-delete-${doc.document_id}`}
+                    >
+                      {deletingId === doc.document_id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
