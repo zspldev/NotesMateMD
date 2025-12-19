@@ -49,6 +49,7 @@ Preferred communication style: Simple, everyday language.
 - **Quick Insert & Abbreviation Expansion**: For common medical phrases and terms.
 - **Patient Management**: Create, edit, delete patients; auto-assigned Medical Record Numbers (MRN).
 - **Visit Document Uploads**: Attach PDFs, images, and documents to patient visits using Replit Object Storage. Documents are stored securely with org-scoped access controls and HIPAA-compliant hierarchical paths.
+- **Document Visibility in Visit History**: Visit history shows documents in two ways: (1) Note entries from visits with documents show a "Documents" button with count badge, (2) Visits with documents but no notes appear as "visit-only" entries with "Documents Only" badge. Clicking opens read-only Sheet drawer showing documents with download capability.
 - **PDF Export**: Export clinical notes with date range selection and professional formatting.
 - **Audio Playback Fix**: Byte-level audio format detection for cross-platform (especially iOS) compatibility.
 - **Audit Trail**: Tracks device, browser, IP address, and user agent for note creation.

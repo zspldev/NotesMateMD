@@ -263,14 +263,16 @@ export default function VisitDocuments({ visitId, readOnly = false }: VisitDocum
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.txt"
-          className="hidden"
-          onChange={handleFileSelect}
-          data-testid="input-file-upload"
-        />
+        {!readOnly && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.txt"
+            className="hidden"
+            onChange={handleFileSelect}
+            data-testid="input-file-upload"
+          />
+        )}
 
         {!readOnly && showUploadForm && selectedFile && (
           <div className="border rounded-md p-4 space-y-3 bg-muted/30" data-testid="form-upload">

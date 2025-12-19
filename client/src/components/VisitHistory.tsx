@@ -51,19 +51,46 @@ interface FlatNote extends VisitNote {
   documentCount?: number;
 }
 
+interface VisitOnlyEntry {
+  type: 'visit-only';
+  visitId: string;
+  visitDate: string;
+  visitPurpose?: string;
+  employeeName: string;
+  employeeTitle: string;
+  documentCount: number;
+}
+
+type HistoryEntry = (FlatNote & { type: 'note' }) | VisitOnlyEntry;
+
 export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientName }: VisitHistoryProps) {
   const [playingNoteId, setPlayingNoteId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
 
-  // Flatten all notes from all visits and sort by createdAt descending (newest first)
-  const allNotes = useMemo(() => {
-    const flatNotes: FlatNote[] = [];
+  // Create unified history entries: notes + visits with documents but no notes
+  const historyEntries = useMemo(() => {
+    const entries: HistoryEntry[] = [];
     
     visits.forEach(visit => {
-      visit.notes.forEach(note => {
-        flatNotes.push({
-          ...note,
+      if (visit.notes.length > 0) {
+        // Add each note as an entry
+        visit.notes.forEach(note => {
+          entries.push({
+            type: 'note',
+            ...note,
+            visitId: visit.visitId,
+            visitDate: visit.visitDate,
+            visitPurpose: visit.visitPurpose,
+            employeeName: visit.employeeName,
+            employeeTitle: visit.employeeTitle,
+            documentCount: visit.documentCount
+          });
+        });
+      } else if (visit.documentCount && visit.documentCount > 0) {
+        // Visit has no notes but has documents - show as visit-only entry
+        entries.push({
+          type: 'visit-only',
           visitId: visit.visitId,
           visitDate: visit.visitDate,
           visitPurpose: visit.visitPurpose,
@@ -71,17 +98,21 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
           employeeTitle: visit.employeeTitle,
           documentCount: visit.documentCount
         });
-      });
+      }
     });
     
-    // Sort by createdAt descending (newest first)
-    flatNotes.sort((a, b) => {
-      const aTime = new Date(a.createdAt).getTime();
-      const bTime = new Date(b.createdAt).getTime();
+    // Sort by date descending (newest first)
+    entries.sort((a, b) => {
+      const aTime = a.type === 'note' 
+        ? new Date(a.createdAt).getTime() 
+        : new Date(a.visitDate).getTime();
+      const bTime = b.type === 'note' 
+        ? new Date(b.createdAt).getTime() 
+        : new Date(b.visitDate).getTime();
       return bTime - aTime;
     });
     
-    return flatNotes;
+    return entries;
   }, [visits]);
 
   // Cleanup audio on unmount
@@ -142,6 +173,15 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
     // Format time in local timezone
     const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     return `${day}/${month}/${year} at ${time}`;
+  };
+
+  const formatVisitDate = (visitDate: string) => {
+    const date = new Date(visitDate);
+    // Format date as DD/MM/YY
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    return `${day}/${month}/${year}`;
   };
 
   const handlePlayPause = async (note: FlatNote) => {
@@ -272,7 +312,7 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {allNotes.length === 0 ? (
+        {historyEntries.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground" data-testid="text-no-visits">
             <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>No previous notes found</p>
@@ -280,60 +320,44 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
           </div>
         ) : (
           <div className="space-y-4">
-            {allNotes.map((note) => (
-              <div 
-                key={note.noteId} 
-                className="border rounded-lg p-4 space-y-3"
-                data-testid={`note-${note.noteId}`}
-              >
-                {/* Note Header with Date/Time */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div className="flex items-center gap-2 text-sm flex-wrap">
-                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="font-medium" data-testid={`text-note-time-${note.noteId}`}>
-                      {formatNoteDateTime(note.createdAt)}
+            {historyEntries.map((entry) => (
+              entry.type === 'visit-only' ? (
+                // Visit-only entry (has documents but no notes)
+                <div 
+                  key={`visit-${entry.visitId}`}
+                  className="border rounded-lg p-4 space-y-3 bg-muted/30"
+                  data-testid={`visit-only-${entry.visitId}`}
+                >
+                  {/* Visit Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-medium" data-testid={`text-visit-date-${entry.visitId}`}>
+                        {formatVisitDate(entry.visitDate)}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      Documents Only
+                    </Badge>
+                  </div>
+
+                  {/* Provider Info */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <User className="h-4 w-4" />
+                    <span data-testid={`text-employee-visit-${entry.visitId}`}>
+                      {entry.employeeName} ({entry.employeeTitle})
                     </span>
-                    {note.audioDurationSeconds && (
+                    {entry.visitPurpose && (
                       <>
-                        <span className="text-muted-foreground hidden sm:inline">•</span>
-                        <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground" data-testid={`text-audio-duration-${note.noteId}`}>
-                          {formatDuration(note.audioDurationSeconds)}
+                        <span>•</span>
+                        <span data-testid={`text-visit-purpose-${entry.visitId}`}>
+                          {entry.visitPurpose}
                         </span>
                       </>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {note.aiTranscribed && (
-                      <Badge variant="secondary" className="text-xs" data-testid={`badge-ai-transcribed-${note.noteId}`}>
-                        <Bot className="h-3 w-3 mr-1" />
-                        AI
-                      </Badge>
-                    )}
-                    {note.isTranscriptionEdited && (
-                      <Badge variant="secondary" className="text-xs">Edited</Badge>
-                    )}
-                  </div>
-                </div>
 
-                {/* Provider Info */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <User className="h-4 w-4" />
-                  <span data-testid={`text-employee-${note.noteId}`}>
-                    {note.employeeName} ({note.employeeTitle})
-                  </span>
-                  {note.visitPurpose && (
-                    <>
-                      <span>•</span>
-                      <span data-testid={`text-visit-purpose-${note.noteId}`}>
-                        {note.visitPurpose}
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {/* Document Indicator and View Documents Button */}
-                {(note.documentCount && note.documentCount > 0) && (
+                  {/* Documents Button */}
                   <div className="flex items-center gap-2">
                     <Sheet>
                       <SheetTrigger asChild>
@@ -341,12 +365,12 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
                           variant="outline"
                           size="sm"
                           className="flex items-center gap-2"
-                          data-testid={`button-view-documents-${note.visitId}`}
+                          data-testid={`button-view-documents-${entry.visitId}`}
                         >
                           <Paperclip className="h-4 w-4" />
                           <span>Documents</span>
-                          <Badge variant="secondary" className="ml-1" data-testid={`badge-doc-count-${note.visitId}`}>
-                            {note.documentCount}
+                          <Badge variant="secondary" className="ml-1" data-testid={`badge-doc-count-${entry.visitId}`}>
+                            {entry.documentCount}
                           </Badge>
                         </Button>
                       </SheetTrigger>
@@ -355,99 +379,182 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
                           <SheetTitle>Visit Documents</SheetTitle>
                         </SheetHeader>
                         <div className="mt-4">
-                          <VisitDocuments visitId={note.visitId} readOnly />
+                          <VisitDocuments visitId={entry.visitId} readOnly />
                         </div>
                       </SheetContent>
                     </Sheet>
                   </div>
-                )}
-
-                {/* Device/Browser Tracking Info - Only shows device type and browser (non-sensitive) */}
-                {(note.deviceType || note.browserName) && (
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                    {note.deviceType && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center gap-1 cursor-default">
-                            {note.deviceType === 'Mobile' && <Smartphone className="h-3 w-3" />}
-                            {note.deviceType === 'Tablet' && <Tablet className="h-3 w-3" />}
-                            {note.deviceType === 'Desktop' && <Monitor className="h-3 w-3" />}
-                            <span data-testid={`text-device-${note.noteId}`}>{note.deviceType}</span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Device used to create this note</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {note.browserName && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center gap-1 cursor-default">
-                            <Globe className="h-3 w-3" />
-                            <span data-testid={`text-browser-${note.noteId}`}>{note.browserName}</span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Browser used to create this note</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                )}
-
-                {/* Audio Controls */}
-                {note.audioFilename && (
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handlePlayPause(note)}
-                      data-testid={`button-play-audio-${note.noteId}`}
-                    >
-                      {playingNoteId === note.noteId ? (
+                </div>
+              ) : (
+                // Note entry
+                <div 
+                  key={entry.noteId} 
+                  className="border rounded-lg p-4 space-y-3"
+                  data-testid={`note-${entry.noteId}`}
+                >
+                  {/* Note Header with Date/Time */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-medium" data-testid={`text-note-time-${entry.noteId}`}>
+                        {formatNoteDateTime(entry.createdAt)}
+                      </span>
+                      {entry.audioDurationSeconds && (
                         <>
-                          <Pause className="h-4 w-4 mr-2" />
-                          Pause Audio
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4 mr-2" />
-                          Play Audio
+                          <span className="text-muted-foreground hidden sm:inline">•</span>
+                          <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-muted-foreground" data-testid={`text-audio-duration-${entry.noteId}`}>
+                            {formatDuration(entry.audioDurationSeconds)}
+                          </span>
                         </>
                       )}
-                    </Button>
-                    <span className="text-xs text-muted-foreground">
-                      {note.audioFilename}
-                    </span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {entry.aiTranscribed && (
+                        <Badge variant="secondary" className="text-xs" data-testid={`badge-ai-transcribed-${entry.noteId}`}>
+                          <Bot className="h-3 w-3 mr-1" />
+                          AI
+                        </Badge>
+                      )}
+                      {entry.isTranscriptionEdited && (
+                        <Badge variant="secondary" className="text-xs">Edited</Badge>
+                      )}
+                    </div>
                   </div>
-                )}
 
-                {/* Transcription */}
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Transcription:</div>
-                  <div 
-                    className="text-sm p-3 bg-muted/50 rounded border min-h-[60px] whitespace-pre-wrap"
-                    data-testid={`text-transcription-${note.noteId}`}
-                  >
-                    {note.transcriptionText || (
-                      <span className="text-muted-foreground italic">
-                        No transcription available
-                      </span>
+                  {/* Provider Info */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <User className="h-4 w-4" />
+                    <span data-testid={`text-employee-${entry.noteId}`}>
+                      {entry.employeeName} ({entry.employeeTitle})
+                    </span>
+                    {entry.visitPurpose && (
+                      <>
+                        <span>•</span>
+                        <span data-testid={`text-visit-purpose-${entry.noteId}`}>
+                          {entry.visitPurpose}
+                        </span>
+                      </>
                     )}
                   </div>
-                </div>
 
-                {/* View Full Note Button */}
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => onViewNote(note.noteId)}
-                  data-testid={`button-view-note-${note.noteId}`}
-                >
-                  View Full Note
-                </Button>
-              </div>
+                  {/* Document Indicator and View Documents Button */}
+                  {entry.documentCount !== undefined && entry.documentCount > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Sheet>
+                        <SheetTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-2"
+                            data-testid={`button-view-documents-${entry.visitId}`}
+                          >
+                            <Paperclip className="h-4 w-4" />
+                            <span>Documents</span>
+                            <Badge variant="secondary" className="ml-1" data-testid={`badge-doc-count-${entry.visitId}`}>
+                              {entry.documentCount}
+                            </Badge>
+                          </Button>
+                        </SheetTrigger>
+                        <SheetContent className="sm:max-w-md overflow-y-auto">
+                          <SheetHeader>
+                            <SheetTitle>Visit Documents</SheetTitle>
+                          </SheetHeader>
+                          <div className="mt-4">
+                            <VisitDocuments visitId={entry.visitId} readOnly />
+                          </div>
+                        </SheetContent>
+                      </Sheet>
+                    </div>
+                  )}
+
+                  {/* Device/Browser Tracking Info - Only shows device type and browser (non-sensitive) */}
+                  {(entry.deviceType || entry.browserName) && (
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                      {entry.deviceType && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 cursor-default">
+                              {entry.deviceType === 'Mobile' && <Smartphone className="h-3 w-3" />}
+                              {entry.deviceType === 'Tablet' && <Tablet className="h-3 w-3" />}
+                              {entry.deviceType === 'Desktop' && <Monitor className="h-3 w-3" />}
+                              <span data-testid={`text-device-${entry.noteId}`}>{entry.deviceType}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Device used to create this note</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {entry.browserName && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 cursor-default">
+                              <Globe className="h-3 w-3" />
+                              <span data-testid={`text-browser-${entry.noteId}`}>{entry.browserName}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Browser used to create this note</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Audio Controls */}
+                  {entry.audioFilename && (
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handlePlayPause(entry)}
+                        data-testid={`button-play-audio-${entry.noteId}`}
+                      >
+                        {playingNoteId === entry.noteId ? (
+                          <>
+                            <Pause className="h-4 w-4 mr-2" />
+                            Pause Audio
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-2" />
+                            Play Audio
+                          </>
+                        )}
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        {entry.audioFilename}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Transcription */}
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">Transcription:</div>
+                    <div 
+                      className="text-sm p-3 bg-muted/50 rounded border min-h-[60px] whitespace-pre-wrap"
+                      data-testid={`text-transcription-${entry.noteId}`}
+                    >
+                      {entry.transcriptionText || (
+                        <span className="text-muted-foreground italic">
+                          No transcription available
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* View Full Note Button */}
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => onViewNote(entry.noteId)}
+                    data-testid={`button-view-note-${entry.noteId}`}
+                  >
+                    View Full Note
+                  </Button>
+                </div>
+              )
             ))}
           </div>
         )}

@@ -762,26 +762,34 @@ export class DatabaseStorage implements IStorage {
 
   // Visit methods
   async getVisits(patientid: string): Promise<VisitWithDocCount[]> {
-    // Get visits with document count using a subquery
-    const result = await db.select({
-      visitid: visits.visitid,
-      patientid: visits.patientid,
-      empid: visits.empid,
-      visit_date: visits.visit_date,
-      visit_purpose: visits.visit_purpose,
-      created_at: visits.created_at,
-      document_count: sql<number>`COALESCE((
-        SELECT COUNT(*)::int 
-        FROM visit_documents 
-        WHERE visit_documents.visit_id = ${visits.visitid} 
-        AND visit_documents.is_deleted = false
-      ), 0)`.as('document_count')
-    })
+    // Get visits first
+    const visitsData = await db.select()
       .from(visits)
       .where(eq(visits.patientid, patientid))
       .orderBy(desc(visits.visit_date));
     
-    return result;
+    // Get document counts for all visits in this patient
+    const docCounts = await db.select({
+      visitid: visit_documents.visitid,
+      count: sql<number>`COUNT(*)::int`.as('count')
+    })
+      .from(visit_documents)
+      .where(
+        and(
+          inArray(visit_documents.visitid, visitsData.map(v => v.visitid)),
+          eq(visit_documents.is_deleted, false)
+        )
+      )
+      .groupBy(visit_documents.visitid);
+    
+    // Create a map for quick lookup
+    const docCountMap = new Map(docCounts.map(d => [d.visitid, d.count]));
+    
+    // Merge visits with document counts
+    return visitsData.map(visit => ({
+      ...visit,
+      document_count: docCountMap.get(visit.visitid) || 0
+    }));
   }
 
   async getVisit(visitid: string): Promise<Visit | undefined> {
