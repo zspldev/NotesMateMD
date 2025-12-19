@@ -28,6 +28,8 @@ export interface IStorage {
   getEmployee(empid: string): Promise<Employee | undefined>;
   getEmployeeByUsername(username: string): Promise<Employee | undefined>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
+  updateEmployee(empid: string, updates: Partial<Omit<InsertEmployee, 'password_hash'>>): Promise<Employee | undefined>;
+  updateEmployeePassword(empid: string, newPasswordHash: string): Promise<Employee | undefined>;
   authenticateEmployee(username: string, password: string): Promise<Employee | null>;
 
   // Patient operations
@@ -358,6 +360,24 @@ export class MemStorage implements IStorage {
     return employee;
   }
 
+  async updateEmployee(empid: string, updates: Partial<Omit<InsertEmployee, 'password_hash'>>): Promise<Employee | undefined> {
+    const employee = this.employees.get(empid);
+    if (!employee) return undefined;
+    
+    const updatedEmployee: Employee = { ...employee, ...updates };
+    this.employees.set(empid, updatedEmployee);
+    return updatedEmployee;
+  }
+
+  async updateEmployeePassword(empid: string, newPasswordHash: string): Promise<Employee | undefined> {
+    const employee = this.employees.get(empid);
+    if (!employee) return undefined;
+    
+    const updatedEmployee: Employee = { ...employee, password_hash: newPasswordHash };
+    this.employees.set(empid, updatedEmployee);
+    return updatedEmployee;
+  }
+
   async authenticateEmployee(username: string, password: string): Promise<Employee | null> {
     const employee = await this.getEmployeeByUsername(username);
     if (!employee) return null;
@@ -685,6 +705,22 @@ export class DatabaseStorage implements IStorage {
 
   async createEmployee(employee: InsertEmployee): Promise<Employee> {
     const result = await db.insert(employees).values(employee).returning();
+    return result[0];
+  }
+
+  async updateEmployee(empid: string, updates: Partial<Omit<InsertEmployee, 'password_hash'>>): Promise<Employee | undefined> {
+    const result = await db.update(employees)
+      .set(updates)
+      .where(eq(employees.empid, empid))
+      .returning();
+    return result[0];
+  }
+
+  async updateEmployeePassword(empid: string, newPasswordHash: string): Promise<Employee | undefined> {
+    const result = await db.update(employees)
+      .set({ password_hash: newPasswordHash })
+      .where(eq(employees.empid, empid))
+      .returning();
     return result[0];
   }
 

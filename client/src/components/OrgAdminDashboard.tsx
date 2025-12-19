@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { api, type LoginResponse } from "../lib/api";
 import { format } from "date-fns";
+import EmployeeManagement from "./EmployeeManagement";
 
 interface OrgAdminDashboardProps {
   loginData: LoginResponse;
@@ -72,6 +73,20 @@ export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminD
       
       const patients = await api.getPatients(orgid);
       
+      // Fetch employee count
+      let totalEmployees = 0;
+      try {
+        const empResponse = await fetch('/api/employees', {
+          headers: { 'Authorization': `Bearer ${api.getAccessToken()}` }
+        });
+        if (empResponse.ok) {
+          const employees = await empResponse.json();
+          totalEmployees = employees.length;
+        }
+      } catch (e) {
+        console.warn('Could not fetch employee count');
+      }
+      
       // Calculate stats from patients
       let totalVisits = 0;
       let totalNotes = 0;
@@ -89,7 +104,7 @@ export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminD
       
       setStats({
         totalPatients: patients.length,
-        totalEmployees: 1, // Would need API to count org employees
+        totalEmployees,
         totalVisits,
         totalNotes
       });
@@ -338,21 +353,11 @@ export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminD
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" style={{ color: '#17a2b8' }} />
+                  <Settings className="h-5 w-5" style={{ color: '#17a2b8' }} />
                   Quick Actions
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button 
-                  className="w-full justify-start" 
-                  variant="outline"
-                  disabled
-                  data-testid="button-manage-team"
-                >
-                  <Users className="h-4 w-4 mr-2" />
-                  Manage Team Members
-                  <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
-                </Button>
                 <Button 
                   className="w-full justify-start" 
                   variant="outline"
@@ -366,6 +371,9 @@ export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminD
               </CardContent>
             </Card>
           </div>
+
+          {/* Employee Management Section */}
+          <EmployeeManagement />
 
           <Card>
             <CardHeader>

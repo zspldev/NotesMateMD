@@ -660,6 +660,275 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============ EMPLOYEE MANAGEMENT ENDPOINTS ============
+
+  // Get all employees for organization (org_admin or super_admin only)
+  app.get("/api/employees", requireAuth('manage_employees'), async (req, res) => {
+    try {
+      const authContext = req.authContext!;
+      const targetOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      if (!targetOrgId) {
+        return res.status(400).json({ error: "No organization context" });
+      }
+      
+      const employees = await storage.getEmployees(targetOrgId);
+      
+      // Return employees without password hash for security
+      const safeEmployees = employees.map(emp => ({
+        empid: emp.empid,
+        orgid: emp.orgid,
+        username: emp.username,
+        first_name: emp.first_name,
+        last_name: emp.last_name,
+        title: emp.title,
+        role: emp.role,
+        secondary_role: emp.secondary_role,
+        is_active: emp.is_active,
+        created_at: emp.created_at
+      }));
+      
+      res.json(safeEmployees);
+    } catch (error) {
+      console.error('Get employees error:', error);
+      res.status(500).json({ error: "Failed to get employees" });
+    }
+  });
+
+  // Create new employee (org_admin or super_admin only)
+  app.post("/api/employees", requireAuth('manage_employees'), async (req, res) => {
+    try {
+      const authContext = req.authContext!;
+      const targetOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      
+      if (!targetOrgId) {
+        return res.status(400).json({ error: "No organization context" });
+      }
+      
+      const { username, password, first_name, last_name, title, role, secondary_role } = req.body;
+      
+      // Validate required fields
+      if (!username || !password || !first_name || !last_name) {
+        return res.status(400).json({ error: "Username, password, first name, and last name are required" });
+      }
+      
+      // Validate role
+      const validRoles = ['org_admin', 'doctor', 'staff'];
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be org_admin, doctor, or staff" });
+      }
+      
+      // Validate secondary_role if provided
+      const validSecondaryRoles = ['doctor', 'staff', null];
+      if (secondary_role && !validSecondaryRoles.includes(secondary_role)) {
+        return res.status(400).json({ error: "Invalid secondary role. Must be doctor or staff" });
+      }
+      
+      // Check if username already exists
+      const existingEmployee = await storage.getEmployeeByUsername(username);
+      if (existingEmployee) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+      
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, 10);
+      
+      // Create employee
+      const newEmployee = await storage.createEmployee({
+        orgid: targetOrgId,
+        username,
+        password_hash: passwordHash,
+        first_name,
+        last_name,
+        title: title || null,
+        role: role || 'doctor',
+        secondary_role: secondary_role || null,
+        is_active: true
+      });
+      
+      // Return without password hash
+      res.status(201).json({
+        empid: newEmployee.empid,
+        orgid: newEmployee.orgid,
+        username: newEmployee.username,
+        first_name: newEmployee.first_name,
+        last_name: newEmployee.last_name,
+        title: newEmployee.title,
+        role: newEmployee.role,
+        secondary_role: newEmployee.secondary_role,
+        is_active: newEmployee.is_active,
+        created_at: newEmployee.created_at
+      });
+    } catch (error) {
+      console.error('Create employee error:', error);
+      res.status(500).json({ error: "Failed to create employee" });
+    }
+  });
+
+  // Update employee (org_admin or super_admin only)
+  app.put("/api/employees/:empid", requireAuth('manage_employees'), async (req, res) => {
+    try {
+      const authContext = req.authContext!;
+      const targetOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      const { empid } = req.params;
+      
+      if (!targetOrgId) {
+        return res.status(400).json({ error: "No organization context" });
+      }
+      
+      // Get the employee to verify they belong to the org
+      const employee = await storage.getEmployee(empid);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+      
+      // Check org ownership (unless super_admin)
+      if (authContext.role !== 'super_admin' && employee.orgid !== targetOrgId) {
+        return res.status(403).json({ error: "Cannot modify employee from different organization" });
+      }
+      
+      // Prevent modifying super_admin
+      if (employee.role === 'super_admin') {
+        return res.status(403).json({ error: "Cannot modify super admin accounts" });
+      }
+      
+      const { first_name, last_name, title, role, secondary_role, is_active } = req.body;
+      
+      // Validate role if provided
+      const validRoles = ['org_admin', 'doctor', 'staff'];
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be org_admin, doctor, or staff" });
+      }
+      
+      // Build updates object
+      const updates: any = {};
+      if (first_name !== undefined) updates.first_name = first_name;
+      if (last_name !== undefined) updates.last_name = last_name;
+      if (title !== undefined) updates.title = title;
+      if (role !== undefined) updates.role = role;
+      if (secondary_role !== undefined) updates.secondary_role = secondary_role || null;
+      if (is_active !== undefined) updates.is_active = is_active;
+      
+      const updatedEmployee = await storage.updateEmployee(empid, updates);
+      
+      if (!updatedEmployee) {
+        return res.status(500).json({ error: "Failed to update employee" });
+      }
+      
+      // Return without password hash
+      res.json({
+        empid: updatedEmployee.empid,
+        orgid: updatedEmployee.orgid,
+        username: updatedEmployee.username,
+        first_name: updatedEmployee.first_name,
+        last_name: updatedEmployee.last_name,
+        title: updatedEmployee.title,
+        role: updatedEmployee.role,
+        secondary_role: updatedEmployee.secondary_role,
+        is_active: updatedEmployee.is_active,
+        created_at: updatedEmployee.created_at
+      });
+    } catch (error) {
+      console.error('Update employee error:', error);
+      res.status(500).json({ error: "Failed to update employee" });
+    }
+  });
+
+  // Reset employee password (org_admin or super_admin only)
+  app.post("/api/employees/:empid/reset-password", requireAuth('manage_employees'), async (req, res) => {
+    try {
+      const authContext = req.authContext!;
+      const targetOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      const { empid } = req.params;
+      const { new_password } = req.body;
+      
+      if (!new_password) {
+        return res.status(400).json({ error: "New password is required" });
+      }
+      
+      if (new_password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      
+      // Get the employee to verify they belong to the org
+      const employee = await storage.getEmployee(empid);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+      
+      // Check org ownership (unless super_admin)
+      if (authContext.role !== 'super_admin' && employee.orgid !== targetOrgId) {
+        return res.status(403).json({ error: "Cannot modify employee from different organization" });
+      }
+      
+      // Prevent modifying super_admin
+      if (employee.role === 'super_admin') {
+        return res.status(403).json({ error: "Cannot modify super admin accounts" });
+      }
+      
+      // Hash new password
+      const passwordHash = await bcrypt.hash(new_password, 10);
+      
+      const updatedEmployee = await storage.updateEmployeePassword(empid, passwordHash);
+      
+      if (!updatedEmployee) {
+        return res.status(500).json({ error: "Failed to reset password" });
+      }
+      
+      res.json({ message: "Password reset successfully" });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
+  // Toggle employee active status (org_admin or super_admin only)
+  app.post("/api/employees/:empid/toggle-active", requireAuth('manage_employees'), async (req, res) => {
+    try {
+      const authContext = req.authContext!;
+      const targetOrgId = authContext.impersonatedOrgId || authContext.orgid;
+      const { empid } = req.params;
+      
+      // Get the employee to verify they belong to the org
+      const employee = await storage.getEmployee(empid);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+      
+      // Check org ownership (unless super_admin)
+      if (authContext.role !== 'super_admin' && employee.orgid !== targetOrgId) {
+        return res.status(403).json({ error: "Cannot modify employee from different organization" });
+      }
+      
+      // Prevent modifying super_admin
+      if (employee.role === 'super_admin') {
+        return res.status(403).json({ error: "Cannot modify super admin accounts" });
+      }
+      
+      // Prevent deactivating yourself
+      if (employee.empid === authContext.empid) {
+        return res.status(400).json({ error: "Cannot deactivate your own account" });
+      }
+      
+      const updatedEmployee = await storage.updateEmployee(empid, { is_active: !employee.is_active });
+      
+      if (!updatedEmployee) {
+        return res.status(500).json({ error: "Failed to toggle employee status" });
+      }
+      
+      res.json({
+        empid: updatedEmployee.empid,
+        is_active: updatedEmployee.is_active,
+        message: updatedEmployee.is_active ? "Employee activated" : "Employee deactivated"
+      });
+    } catch (error) {
+      console.error('Toggle active error:', error);
+      res.status(500).json({ error: "Failed to toggle employee status" });
+    }
+  });
+
+  // ============ END EMPLOYEE MANAGEMENT ENDPOINTS ============
+
   // Create organization (super admin only)
   app.post("/api/organizations", requireAuth(), async (req, res) => {
     try {
