@@ -70,3 +70,4 @@ Preferred communication style: Simple, everyday language.
 - **Deployment**: Replit-optimized
 - **AI Integration**: Replit AI Integrations (for OpenAI access)
 - **Object Storage**: Replit Object Storage (@replit/object-storage) for secure document uploads
+  - **Important**: `downloadAsBytes()` returns `Result<[Buffer], Error>` (array containing buffer), not just `Buffer`. Access `result.value[0]` to get the actual file data.
