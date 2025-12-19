@@ -11,7 +11,6 @@ import {
   Loader2,
   Settings,
   Stethoscope,
-  ArrowRightLeft,
   Download,
   HardDrive,
   FileDown,
@@ -184,12 +183,6 @@ export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminD
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleSwitchToDoctor = () => {
-    if (onSwitchRole) {
-      onSwitchRole('doctor');
-    }
-  };
-
   return (
     <div className="space-y-6">
       <Card>
@@ -204,28 +197,15 @@ export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminD
                 </CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {hasSecondaryRole && (
-                <Button
-                  variant="outline"
-                  onClick={handleSwitchToDoctor}
-                  className="gap-2"
-                  data-testid="button-switch-to-doctor"
-                >
-                  <ArrowRightLeft className="h-4 w-4" />
-                  Switch to Clinical View
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={loadData}
-                disabled={isLoading}
-                data-testid="button-refresh-stats"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={loadData}
+              disabled={isLoading}
+              data-testid="button-refresh-stats"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </CardHeader>
       </Card>

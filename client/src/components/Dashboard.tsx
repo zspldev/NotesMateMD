@@ -646,7 +646,7 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
                   className="gap-1"
                 >
                   <ArrowRightLeft className="h-4 w-4" />
-                  {isInAdminView ? 'Clinical View' : 'Admin View'}
+                  {isInAdminView ? 'Switch to Clinical View' : 'Switch to Admin View'}
                 </Button>
               )}
               
