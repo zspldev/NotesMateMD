@@ -1446,16 +1446,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Download from object storage
       const objectStorage = getObjectStorage();
-      const { ok, value: fileBuffer } = await objectStorage.downloadAsBytes(document.storage_key);
       
-      if (!ok || !fileBuffer) {
+      console.log(`Downloading document: storage_key=${document.storage_key}, expected_size=${document.file_size_bytes}`);
+      
+      const result = await objectStorage.downloadAsBytes(document.storage_key);
+      // Note: downloadAsBytes returns Result<[Buffer], Error> - value is an array containing the buffer
+      const bufferArray = result.value;
+      const actualBuffer = bufferArray && bufferArray.length > 0 ? bufferArray[0] : null;
+      console.log(`Download result: ok=${result.ok}, bufferLength=${actualBuffer?.length || 0}`);
+      
+      if (!result.ok || !actualBuffer) {
+        console.error('Failed to download from object storage:', result);
         return res.status(404).json({ error: "Document file not found in storage" });
       }
       
+      console.log(`Sending file: length=${actualBuffer.length}`);
+      
       res.setHeader('Content-Type', document.mime_type);
       res.setHeader('Content-Disposition', `attachment; filename="${document.original_filename}"`);
-      res.setHeader('Content-Length', document.file_size_bytes.toString());
-      res.send(Buffer.from(fileBuffer));
+      res.setHeader('Content-Length', actualBuffer.length.toString());
+      res.send(actualBuffer);
     } catch (error) {
       console.error('Download document error:', error);
       res.status(500).json({ error: "Internal server error" });
