@@ -465,6 +465,7 @@ export default function AudioRecorder({
               onClick={startRecording}
               disabled={isReadOnly}
               data-testid="button-start-recording"
+              style={{ backgroundColor: '#17a2b8' }}
             >
               <Mic className="h-6 w-6" />
             </Button>
@@ -593,6 +594,7 @@ export default function AudioRecorder({
                 className="w-full"
                 data-testid="button-save-note"
                 disabled={isSaving || isTranscribing}
+                style={{ backgroundColor: '#17a2b8' }}
               >
                 {isSaving ? (
                   <>

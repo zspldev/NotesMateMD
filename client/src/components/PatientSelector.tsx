@@ -328,6 +328,7 @@ export default function PatientSelector({
             <Button 
               onClick={onCreateNewPatient}
               data-testid="button-create-new-patient"
+              style={{ backgroundColor: '#17a2b8' }}
             >
               <UserPlus className="h-4 w-4 mr-2" />
               New Patient

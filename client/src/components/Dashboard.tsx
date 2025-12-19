@@ -467,6 +467,7 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
                       onClick={handleStartNewVisit}
                       data-testid="button-start-new-visit"
                       className="flex-1 sm:flex-none"
+                      style={{ backgroundColor: '#17a2b8' }}
                     >
                       <Calendar className="h-4 w-4 mr-2" />
                       New Visit

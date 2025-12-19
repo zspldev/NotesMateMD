@@ -326,6 +326,7 @@ export default function AddOrganizationDialog({
               type="submit"
               disabled={isSubmitting || !nextOrgNumber}
               data-testid="button-create-org"
+              style={{ backgroundColor: '#17a2b8' }}
             >
               {isSubmitting ? (
                 <>

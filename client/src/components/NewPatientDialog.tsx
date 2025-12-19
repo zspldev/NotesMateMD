@@ -227,6 +227,7 @@ export default function NewPatientDialog({
                 type="submit"
                 disabled={isSubmitting}
                 data-testid="button-submit"
+                style={{ backgroundColor: '#17a2b8' }}
               >
                 {isSubmitting ? (
                   <>

@@ -271,6 +271,7 @@ export default function ExportPDFDialog({
             onClick={handleExport}
             disabled={isExporting}
             data-testid="button-export-pdf"
+            style={{ backgroundColor: '#17a2b8' }}
           >
             {isExporting ? (
               <>

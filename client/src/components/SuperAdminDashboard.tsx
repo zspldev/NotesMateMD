@@ -233,7 +233,7 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
             </div>
             <div className="flex items-center gap-2">
               <Button 
-                variant="outline" 
+                variant="ghost" 
                 size="icon"
                 onClick={loadData}
                 disabled={isLoading}
@@ -244,6 +244,7 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
               <Button 
                 onClick={() => setShowAddDialog(true)}
                 data-testid="button-add-org"
+                style={{ backgroundColor: '#17a2b8' }}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Organization
@@ -300,6 +301,7 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
                       onClick={() => org.org_number && handleLoginToOrg(org.org_number)}
                       disabled={!org.is_active}
                       data-testid={`button-login-org-${org.org_number}`}
+                      style={{ backgroundColor: '#17a2b8' }}
                     >
                       <LogIn className="h-4 w-4 mr-2" />
                       Enter
