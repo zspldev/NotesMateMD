@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { User, Lock, Building2 } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Dashboard from "@/components/Dashboard";
+import AboutFooter from "@/components/AboutFooter";
 import ColorPreview from "@/pages/ColorPreview";
 import LogoMockup from "@/pages/LogoMockup";
 import NotFound from "@/pages/not-found";
@@ -154,6 +155,9 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
           </div>
         </CardContent>
       </Card>
+      
+      {/* About Footer */}
+      <AboutFooter />
     </div>
   );
 }

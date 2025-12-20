@@ -37,6 +37,7 @@ import NewPatientDialog from "./NewPatientDialog";
 import ExportPDFDialog from "./ExportPDFDialog";
 import SuperAdminDashboard from "./SuperAdminDashboard";
 import OrgAdminDashboard from "./OrgAdminDashboard";
+import AboutFooter from "./AboutFooter";
 import { useToast } from "@/hooks/use-toast";
 import { api, type LoginResponse, type Patient, type Visit } from "../lib/api";
 import type { InsertPatient } from "@shared/schema";
@@ -740,6 +741,9 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* About Footer */}
+      <AboutFooter />
     </div>
   );
 }
