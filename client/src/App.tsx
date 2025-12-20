@@ -153,11 +153,11 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
             <p>Org: 1002, User: dr.smith, Pass: simple123</p>
             <p>Super Admin: super.admin, Pass: simple123</p>
           </div>
+          
+          {/* About Footer */}
+          <AboutFooter />
         </CardContent>
       </Card>
-      
-      {/* About Footer */}
-      <AboutFooter />
     </div>
   );
 }
