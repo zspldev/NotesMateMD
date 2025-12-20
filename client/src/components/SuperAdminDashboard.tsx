@@ -20,7 +20,6 @@ import {
 import { api, type LoginResponse } from "../lib/api";
 import AddOrganizationDialog from "./AddOrganizationDialog";
 import EditOrganizationDialog from "./EditOrganizationDialog";
-import AboutFooter from "./AboutFooter";
 import { format } from "date-fns";
 
 interface SuperAdminDashboardProps {
@@ -413,9 +412,6 @@ export default function SuperAdminDashboard({ loginData, onSwitchOrg }: SuperAdm
         organization={selectedOrg}
         onSuccess={loadData}
       />
-
-      {/* About Footer */}
-      <AboutFooter />
     </div>
   );
 }

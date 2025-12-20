@@ -19,7 +19,6 @@ import {
 import { api, type LoginResponse } from "../lib/api";
 import { format } from "date-fns";
 import EmployeeManagement from "./EmployeeManagement";
-import AboutFooter from "./AboutFooter";
 
 interface OrgAdminDashboardProps {
   loginData: LoginResponse;
@@ -461,9 +460,6 @@ export default function OrgAdminDashboard({ loginData, onSwitchRole }: OrgAdminD
           </Card>
         </>
       )}
-
-      {/* About Footer */}
-      <AboutFooter />
     </div>
   );
 }
