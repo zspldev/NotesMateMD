@@ -54,6 +54,16 @@ Preferred communication style: Simple, everyday language.
 - **Audio Playback Fix**: Byte-level audio format detection for cross-platform (especially iOS) compatibility.
 - **Audit Trail**: Tracks device, browser, IP address, and user agent for note creation.
 - **Org-Level Backup**: Organization admins can export all org data (patients, visits, notes) as JSON. All backups are logged with file size, record counts, and timestamps. Super admins can view backup activity across all organizations.
+- **Employee Management**: Full CRUD operations for org admins to add, edit, reset passwords, and activate/deactivate team members. Only org_admin and super_admin roles have `manage_employees` permission.
+- **About Footer**: Displays "© 2025, Zapurzaa Systems" with clickable link opening version info dialog (Beta v0.9, December 20, 2025). Footer appears inside login card and at bottom of Dashboard.
+- **Button Color Standardization**: All primary action buttons use medical teal (#17a2b8) across the application for consistency.
+
+### Demo Credentials
+- **Organization 1002**: User `dr.smith` / Password `simple123`
+  - Role: `org_admin` with secondary role `doctor`
+  - Can access Admin Dashboard (employee management, backups) and switch to Clinical View for patient care
+- **Super Admin**: User `super.admin` / Password `simple123`
+  - Full system access, organization management, cross-org visibility
 
 ### Medical Domain Model
 - **Organizations**: Multi-tenant support with unique `org_number` and `org_shortname`.
