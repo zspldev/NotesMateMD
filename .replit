@@ -40,3 +40,13 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:1.0.0", "javascript_object_storage:1.0.0", "github:1.0.0", "javascript_openai_ai_integrations:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+AWS_RDS_HOST = "notesmate-db.crucc0sgwttq.ap-south-1.rds.amazonaws.com"
+AWS_RDS_PORT = "5432"
+AWS_RDS_DATABASE = "notesmate"
+AWS_RDS_USER = "notesmate_admin"
+AWS_S3_BUCKET = "notesmate-files-mumbai"
+AWS_REGION = "ap-south-1"

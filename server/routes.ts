@@ -10,7 +10,7 @@ import {
 } from "@shared/schema";
 import multer from "multer";
 import bcrypt from "bcrypt";
-import { Client as ObjectStorageClient } from "@replit/object-storage";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { transcriptionService, type TranscriptionResult, type TranscriptionError } from "./transcription";
 import { 
   formatTranscriptionToTemplate, 
@@ -159,18 +159,36 @@ const documentUpload = multer({
   }
 });
 
-// Initialize object storage client - lazy initialization
-let objectStorageClient: ObjectStorageClient | null = null;
+// Initialize AWS S3 client - lazy initialization
+let s3Client: S3Client | null = null;
 
-function getObjectStorage(): ObjectStorageClient {
-  if (!objectStorageClient) {
-    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
-    if (!bucketId) {
-      throw new Error('Object storage is not configured. Please set up a storage bucket.');
+function getS3Client(): S3Client {
+  if (!s3Client) {
+    const region = process.env.AWS_REGION || 'ap-south-1';
+    const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+    
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error('AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.');
     }
-    objectStorageClient = new ObjectStorageClient({ bucketId });
+    
+    s3Client = new S3Client({
+      region,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      }
+    });
   }
-  return objectStorageClient;
+  return s3Client;
+}
+
+function getS3Bucket(): string {
+  const bucket = process.env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('AWS S3 bucket not configured. Please set AWS_S3_BUCKET.');
+  }
+  return bucket;
 }
 
 // Helper function to detect database connection errors
@@ -1644,11 +1662,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate storage key: org/{orgid}/patients/{patientid}/visits/{visitid}/documents/{uuid}_{filename}
       const documentId = crypto.randomUUID();
       const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const storageKey = `${process.env.PRIVATE_OBJECT_DIR}/org/${patient.orgid}/patients/${patient.patientid}/visits/${visitid}/documents/${documentId}_${safeFilename}`;
+      const storageKey = `documents/org/${patient.orgid}/patients/${patient.patientid}/visits/${visitid}/${documentId}_${safeFilename}`;
       
-      // Upload to object storage
-      const objectStorage = getObjectStorage();
-      await objectStorage.uploadFromBytes(storageKey, req.file.buffer);
+      // Upload to AWS S3
+      const s3 = getS3Client();
+      const bucket = getS3Bucket();
+      await s3.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: storageKey,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype,
+      }));
       
       // Create database record
       const documentRecord = await storage.createVisitDocument({
@@ -1713,28 +1737,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied: document not in your organization" });
       }
       
-      // Download from object storage
-      const objectStorage = getObjectStorage();
+      // Download from AWS S3
+      const s3 = getS3Client();
+      const bucket = getS3Bucket();
       
       console.log(`Downloading document: storage_key=${document.storage_key}, expected_size=${document.file_size_bytes}`);
       
-      const result = await objectStorage.downloadAsBytes(document.storage_key);
-      // Note: downloadAsBytes returns Result<[Buffer], Error> - value is an array containing the buffer
-      const bufferArray = result.value;
-      const actualBuffer = bufferArray && bufferArray.length > 0 ? bufferArray[0] : null;
-      console.log(`Download result: ok=${result.ok}, bufferLength=${actualBuffer?.length || 0}`);
-      
-      if (!result.ok || !actualBuffer) {
-        console.error('Failed to download from object storage:', result);
-        return res.status(404).json({ error: "Document file not found in storage" });
+      try {
+        const response = await s3.send(new GetObjectCommand({
+          Bucket: bucket,
+          Key: document.storage_key,
+        }));
+        
+        if (!response.Body) {
+          console.error('S3 returned empty body');
+          return res.status(404).json({ error: "Document file not found in storage" });
+        }
+        
+        // Transform to byte array
+        const byteArray = await response.Body.transformToByteArray();
+        const actualBuffer = Buffer.from(byteArray);
+        
+        console.log(`Download result: bufferLength=${actualBuffer.length}`);
+        console.log(`Sending file: length=${actualBuffer.length}`);
+        
+        res.setHeader('Content-Type', document.mime_type);
+        res.setHeader('Content-Disposition', `attachment; filename="${document.original_filename}"`);
+        res.setHeader('Content-Length', actualBuffer.length.toString());
+        res.send(actualBuffer);
+      } catch (s3Error: any) {
+        if (s3Error.name === 'NoSuchKey') {
+          console.error('Document not found in S3:', document.storage_key);
+          return res.status(404).json({ error: "Document file not found in storage" });
+        }
+        throw s3Error;
       }
-      
-      console.log(`Sending file: length=${actualBuffer.length}`);
-      
-      res.setHeader('Content-Type', document.mime_type);
-      res.setHeader('Content-Disposition', `attachment; filename="${document.original_filename}"`);
-      res.setHeader('Content-Length', actualBuffer.length.toString());
-      res.send(actualBuffer);
     } catch (error) {
       console.error('Download document error:', error);
       res.status(500).json({ error: "Internal server error" });
