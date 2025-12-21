@@ -13,6 +13,9 @@ async function createSchema() {
   const client = await pool.connect();
   try {
     await client.query(`
+      -- Enable pgcrypto extension for gen_random_uuid()
+      CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+      
       -- Organizations table
       CREATE TABLE IF NOT EXISTS orgs (
         orgid UUID PRIMARY KEY DEFAULT gen_random_uuid(),

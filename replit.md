@@ -25,11 +25,17 @@ Preferred communication style: Simple, everyday language.
 - **Error Handling**: Centralized middleware with structured responses
 
 ### Data Storage
-- **Database**: PostgreSQL with Neon serverless driver
+- **Database**: PostgreSQL on AWS RDS (Mumbai ap-south-1 region for DPDP Act compliance)
+  - Uses standard `pg` driver with SSL
+  - Connection via AWS_RDS_* environment variables
 - **ORM**: Drizzle ORM (type-safe schemas, migrations)
 - **Schema Design**: Medical domain modeling (organizations, employees, patients, visits, visit notes)
 - **Data Validation**: Zod schemas
 - **Storage Strategy**: Interface-based design for production database with in-memory development option
+- **File Storage**: AWS S3 (Mumbai ap-south-1 region)
+  - Bucket: notesmate-files-mumbai
+  - Uses AWS SDK v3 with PutObjectCommand/GetObjectCommand
+  - Documents stored at: `documents/org/{orgid}/patients/{patientid}/visits/{visitid}/{documentId}_{filename}`
 
 ### Authentication and Authorization
 - **Session Management**: Express sessions with PostgreSQL session store
@@ -48,7 +54,7 @@ Preferred communication style: Simple, everyday language.
 - **AI Auto-Format**: Integrates OpenAI for reorganizing transcribed text into selected templates.
 - **Quick Insert & Abbreviation Expansion**: For common medical phrases and terms.
 - **Patient Management**: Create, edit, delete patients; auto-assigned Medical Record Numbers (MRN).
-- **Visit Document Uploads**: Attach PDFs, images, and documents to patient visits using Replit Object Storage. Documents are stored securely with org-scoped access controls and HIPAA-compliant hierarchical paths.
+- **Visit Document Uploads**: Attach PDFs, images, and documents to patient visits using AWS S3 (Mumbai region). Documents are stored securely with org-scoped access controls and HIPAA-compliant hierarchical paths.
 - **Document Visibility in Visit History**: Visit history shows documents in two ways: (1) Note entries from visits with documents show a "Documents" button with count badge, (2) Visits with documents but no notes appear as "visit-only" entries with "Documents Only" badge. Clicking opens read-only Sheet drawer showing documents with download capability.
 - **PDF Export**: Export clinical notes with date range selection and professional formatting.
 - **Audio Playback Fix**: Byte-level audio format detection for cross-platform (especially iOS) compatibility.
@@ -79,5 +85,26 @@ Preferred communication style: Simple, everyday language.
 - **Development Tools**: ESBuild, TSX
 - **Deployment**: Replit-optimized
 - **AI Integration**: Replit AI Integrations (for OpenAI access)
-- **Object Storage**: Replit Object Storage (@replit/object-storage) for secure document uploads
-  - **Important**: `downloadAsBytes()` returns `Result<[Buffer], Error>` (array containing buffer), not just `Buffer`. Access `result.value[0]` to get the actual file data.
+- **AWS Services** (ap-south-1 Mumbai region for DPDP Act compliance):
+  - **AWS RDS PostgreSQL**: Primary database
+  - **AWS S3**: Document storage
+
+## Environment Variables
+### AWS RDS Configuration
+- `AWS_RDS_HOST`: RDS endpoint (notesmate-db.crucc0sgwttq.ap-south-1.rds.amazonaws.com)
+- `AWS_RDS_PORT`: Database port (5432)
+- `AWS_RDS_DATABASE`: Database name (notesmate)
+- `AWS_RDS_USER`: Database user (notesmate_admin)
+- `AWS_RDS_PASSWORD`: Database password (secret)
+
+### AWS S3 Configuration
+- `AWS_S3_BUCKET`: S3 bucket name (notesmate-files-mumbai)
+- `AWS_REGION`: AWS region (ap-south-1)
+- `AWS_ACCESS_KEY_ID`: IAM access key (secret)
+- `AWS_SECRET_ACCESS_KEY`: IAM secret key (secret)
+
+## DPDP Act Compliance
+- All data stored in India (ap-south-1 Mumbai region)
+- AWS RDS for database (PostgreSQL)
+- AWS S3 for file storage
+- Meets data residency requirements for India's Digital Personal Data Protection Act
