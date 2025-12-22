@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,6 +35,15 @@ export default function ExportPDFDialog({
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [isExporting, setIsExporting] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<PresetRange>("last30");
+
+  useEffect(() => {
+    if (open) {
+      const today = new Date();
+      setStartDate(subDays(today, 30));
+      setEndDate(today);
+      setSelectedPreset("last30");
+    }
+  }, [open]);
 
   const handlePresetChange = (preset: PresetRange) => {
     setSelectedPreset(preset);
