@@ -109,3 +109,16 @@ Preferred communication style: Simple, everyday language.
 - AWS RDS for database (PostgreSQL)
 - AWS S3 for file storage
 - Meets data residency requirements for India's Digital Personal Data Protection Act
+
+## CRITICAL: Database Configuration
+**WARNING: This app uses AWS RDS PostgreSQL, NOT Replit's internal PostgreSQL database.**
+
+- The app connects to AWS RDS via `AWS_RDS_*` environment variables (see server/db.ts)
+- Replit's internal DATABASE_URL/PGHOST/etc. variables point to a DIFFERENT unused database
+- The Replit SQL tool (`execute_sql_tool`) connects to Replit's internal DB, NOT AWS RDS
+- To run SQL queries against the actual production data, use bash with psql:
+  ```bash
+  PGPASSWORD="${AWS_RDS_PASSWORD}" psql -h "${AWS_RDS_HOST}" -p "${AWS_RDS_PORT}" -U "${AWS_RDS_USER}" -d "${AWS_RDS_DATABASE}" -c "YOUR SQL HERE"
+  ```
+- drizzle.config.ts uses DATABASE_URL (Replit internal) for migrations only - the app runtime uses AWS RDS
+- All application data (patients, visits, notes, documents) is stored ONLY in AWS RDS
