@@ -242,6 +242,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Debug endpoint to list Replit Object Storage contents
+  app.get("/api/debug/storage-list", async (req, res) => {
+    try {
+      const replitClient = getReplitStorageClient();
+      const prefix = req.query.prefix as string || '.private';
+      console.log(`Listing storage with prefix: ${prefix}`);
+      const result = await replitClient.list({ prefix });
+      if (!result.ok) {
+        return res.status(500).json({ error: 'Failed to list storage', details: result.error });
+      }
+      res.json({ objects: result.value, prefix });
+    } catch (error: any) {
+      console.error('Storage list error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
