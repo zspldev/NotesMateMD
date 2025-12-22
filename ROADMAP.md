@@ -23,6 +23,14 @@
 - [ ] App-like experience without browser UI
 - [ ] Faster loading with cached assets
 - [ ] Update notifications for new versions
+- [ ] Add email IDs and Phone numbers at org-level/employee-level
+- [ ] when a dual-role user logs in, show the clinical view
+- [ ] Add a founder dashboard showing daily changes
+- [ ] Send mass emails to all orgs/doctors
+- [ ] Simple help feature
+- [ ] Add T&C and Provacy Policy
+- [ ] Integrate with a landing page website
+- [ ] 
 
 ### v1.2 - Future Ideas
 - [ ] Offline mode for viewing cached notes
