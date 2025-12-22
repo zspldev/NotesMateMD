@@ -73,23 +73,22 @@ export default function VisitDocuments({ visitId, readOnly = false }: VisitDocum
 
   const uploadMutation = useMutation({
     mutationFn: async ({ file, desc }: { file: File; desc: string }) => {
-      // Validate file before upload
+      // Log file info for debugging
       console.log(`Upload starting: name=${file.name}, size=${file.size}, type=${file.type}`);
       
-      if (file.size === 0) {
+      // Read file FIRST to get actual content - file.size can be unreliable in some browsers
+      const fileBuffer = await file.arrayBuffer();
+      console.log(`File buffer loaded: ${fileBuffer.byteLength} bytes (reported size: ${file.size})`);
+      
+      // Validate based on actual buffer content, not file.size metadata
+      if (fileBuffer.byteLength === 0) {
         throw new Error('File appears to be empty. Please try selecting the file again.');
       }
       
-      if (file.size < 10 && !file.type.startsWith('text/')) {
+      // Only reject very small non-text files based on actual buffer content
+      const isTextFile = file.type.startsWith('text/');
+      if (fileBuffer.byteLength < 10 && !isTextFile) {
         throw new Error('File size is suspiciously small. Please verify the file is not corrupted.');
-      }
-      
-      // Read file to ensure it's fully loaded before creating FormData
-      const fileBuffer = await file.arrayBuffer();
-      console.log(`File buffer loaded: ${fileBuffer.byteLength} bytes`);
-      
-      if (fileBuffer.byteLength === 0) {
-        throw new Error('Could not read file content. Please try again.');
       }
       
       // Create a Blob from the buffer and attach to FormData with filename
