@@ -30,7 +30,7 @@
 - [ ] Simple help feature
 - [ ] Add T&C and Provacy Policy
 - [ ] Integrate with a landing page website
-- [ ] 
+- [ ] Add Help feature and/or Tawk.to 
 
 ### v1.2 - Future Ideas
 - [ ] Offline mode for viewing cached notes

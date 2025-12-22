@@ -882,14 +882,15 @@ export class DatabaseStorage implements IStorage {
     const org = await this.getOrg(patient.orgid);
     if (!org) return null;
     
-    // Build date range for filtering
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    // Build date range for filtering - parse as UTC to avoid timezone issues
+    const start = new Date(startDate + 'T00:00:00.000Z');
+    const end = new Date(endDate + 'T23:59:59.999Z');
+    
+    console.log(`getPatientNotesByDateRange: patient=${patientid}, start=${start.toISOString()}, end=${end.toISOString()}`);
     
     // Get all visits for this patient
     const patientVisits = await this.getVisits(patientid);
+    console.log(`getPatientNotesByDateRange: Found ${patientVisits.length} visits for patient`);
     
     // Collect notes with context
     const notesWithContext: Array<{ note: VisitNote; visit: Visit; employee: Employee }> = [];

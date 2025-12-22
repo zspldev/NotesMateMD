@@ -11,6 +11,7 @@ import {
 import multer from "multer";
 import bcrypt from "bcrypt";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { Client as ReplitObjectStorageClient } from "@replit/object-storage";
 import { transcriptionService, type TranscriptionResult, type TranscriptionError } from "./transcription";
 import { 
   formatTranscriptionToTemplate, 
@@ -189,6 +190,21 @@ function getS3Bucket(): string {
     throw new Error('AWS S3 bucket not configured. Please set AWS_S3_BUCKET.');
   }
   return bucket;
+}
+
+// Initialize Replit Object Storage client for legacy documents - lazy initialization
+let replitStorageClient: ReplitObjectStorageClient | null = null;
+
+function getReplitStorageClient(): ReplitObjectStorageClient {
+  if (!replitStorageClient) {
+    replitStorageClient = new ReplitObjectStorageClient();
+  }
+  return replitStorageClient;
+}
+
+// Helper to check if storage_key is from old Replit Object Storage
+function isReplitObjectStoragePath(storageKey: string): boolean {
+  return storageKey.startsWith('/replit-objstore-') || storageKey.startsWith('replit-objstore-');
 }
 
 // Helper function to detect database connection errors
@@ -1238,6 +1254,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Start date and end date are required" });
       }
       
+      console.log(`PDF Export requested for patient ${patientid}, date range: ${startDate} to ${endDate}`);
+      
       const data = await storage.getPatientNotesByDateRange(
         patientid, 
         startDate as string, 
@@ -1245,8 +1263,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       if (!data) {
+        console.log(`PDF Export: Patient ${patientid} not found`);
         return res.status(404).json({ error: "Patient not found" });
       }
+      
+      console.log(`PDF Export: Found ${data.notes.length} notes for patient ${patientid} in date range`);
       
       const filename = generatePatientNotesFilename(patientid, startDate as string, endDate as string);
       
@@ -1737,41 +1758,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied: document not in your organization" });
       }
       
-      // Download from AWS S3
-      const s3 = getS3Client();
-      const bucket = getS3Bucket();
-      
       console.log(`Downloading document: storage_key=${document.storage_key}, expected_size=${document.file_size_bytes}`);
       
-      try {
-        const response = await s3.send(new GetObjectCommand({
-          Bucket: bucket,
-          Key: document.storage_key,
-        }));
-        
-        if (!response.Body) {
-          console.error('S3 returned empty body');
+      let actualBuffer: Buffer;
+      
+      // Check if this is an old Replit Object Storage path or new AWS S3 path
+      if (isReplitObjectStoragePath(document.storage_key)) {
+        // Use Replit Object Storage for legacy documents
+        console.log('Using Replit Object Storage for legacy document');
+        try {
+          const replitClient = getReplitStorageClient();
+          const result = await replitClient.downloadAsBytes(document.storage_key);
+          
+          if (!result.ok) {
+            console.error('Replit Object Storage download failed:', result.error);
+            return res.status(404).json({ error: "Document file not found in storage" });
+          }
+          
+          // Handle various return types from Replit Object Storage
+          if (result.value instanceof Buffer) {
+            actualBuffer = result.value;
+          } else if (result.value instanceof Uint8Array) {
+            actualBuffer = Buffer.from(result.value);
+          } else {
+            actualBuffer = Buffer.from(result.value as unknown as ArrayBuffer);
+          }
+        } catch (replitError: any) {
+          console.error('Replit Object Storage error:', replitError);
           return res.status(404).json({ error: "Document file not found in storage" });
         }
+      } else {
+        // Use AWS S3 for new documents
+        console.log('Using AWS S3 for document');
+        const s3 = getS3Client();
+        const bucket = getS3Bucket();
         
-        // Transform to byte array
-        const byteArray = await response.Body.transformToByteArray();
-        const actualBuffer = Buffer.from(byteArray);
-        
-        console.log(`Download result: bufferLength=${actualBuffer.length}`);
-        console.log(`Sending file: length=${actualBuffer.length}`);
-        
-        res.setHeader('Content-Type', document.mime_type);
-        res.setHeader('Content-Disposition', `attachment; filename="${document.original_filename}"`);
-        res.setHeader('Content-Length', actualBuffer.length.toString());
-        res.send(actualBuffer);
-      } catch (s3Error: any) {
-        if (s3Error.name === 'NoSuchKey') {
-          console.error('Document not found in S3:', document.storage_key);
-          return res.status(404).json({ error: "Document file not found in storage" });
+        try {
+          const response = await s3.send(new GetObjectCommand({
+            Bucket: bucket,
+            Key: document.storage_key,
+          }));
+          
+          if (!response.Body) {
+            console.error('S3 returned empty body');
+            return res.status(404).json({ error: "Document file not found in storage" });
+          }
+          
+          // Transform to byte array
+          const byteArray = await response.Body.transformToByteArray();
+          actualBuffer = Buffer.from(byteArray);
+        } catch (s3Error: any) {
+          if (s3Error.name === 'NoSuchKey') {
+            console.error('Document not found in S3:', document.storage_key);
+            return res.status(404).json({ error: "Document file not found in storage" });
+          }
+          throw s3Error;
         }
-        throw s3Error;
       }
+      
+      console.log(`Download result: bufferLength=${actualBuffer.length}`);
+      console.log(`Sending file: length=${actualBuffer.length}`);
+      
+      res.setHeader('Content-Type', document.mime_type);
+      res.setHeader('Content-Disposition', `attachment; filename="${document.original_filename}"`);
+      res.setHeader('Content-Length', actualBuffer.length.toString());
+      res.send(actualBuffer);
     } catch (error) {
       console.error('Download document error:', error);
       res.status(500).json({ error: "Internal server error" });
