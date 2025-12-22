@@ -43,6 +43,7 @@ Preferred communication style: Simple, everyday language.
 - **Access Control**: Organization-based multi-tenancy with employee role-based access (super_admin, org_admin, doctor, staff)
 - **Session Persistence**: Secure HTTP-only cookies
 - **Token-Based Auth**: HMAC-signed access tokens for API authorization (24-hour expiration) with role, secondaryRole, activeRole, and organization info.
+- **Session Restoration**: JWT tokens stored in sessionStorage allow session persistence across page refreshes via `/api/auth/me` endpoint validation.
 - **Login Flow**: Requires organization code for regular users; super admins can bypass.
 - **Super Admin Console**: Dashboard for managing organizations and impersonating organization contexts.
 - **Organization Management**: Super admins can create, edit, and deactivate organizations with first admin account setup.
