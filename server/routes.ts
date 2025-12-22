@@ -1820,7 +1820,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('Using Replit Object Storage for legacy document');
         try {
           const replitClient = getReplitStorageClient();
-          const result = await replitClient.downloadAsBytes(document.storage_key);
+          
+          // Strip the bucket prefix from the storage key if present
+          // Format: /replit-objstore-{bucketId}/.private/... -> .private/...
+          let cleanKey = document.storage_key;
+          const bucketPrefixMatch = cleanKey.match(/^\/?replit-objstore-[a-f0-9-]+\/(.+)$/);
+          if (bucketPrefixMatch) {
+            cleanKey = bucketPrefixMatch[1];
+          }
+          console.log(`Cleaned storage key: ${cleanKey}`);
+          
+          const result = await replitClient.downloadAsBytes(cleanKey);
           
           if (!result.ok) {
             console.error('Replit Object Storage download failed:', result.error);
