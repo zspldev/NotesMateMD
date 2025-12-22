@@ -197,7 +197,11 @@ let replitStorageClient: ReplitObjectStorageClient | null = null;
 
 function getReplitStorageClient(): ReplitObjectStorageClient {
   if (!replitStorageClient) {
-    replitStorageClient = new ReplitObjectStorageClient();
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    if (!bucketId) {
+      throw new Error('Replit Object Storage bucket ID not configured. Please set DEFAULT_OBJECT_STORAGE_BUCKET_ID.');
+    }
+    replitStorageClient = new ReplitObjectStorageClient({ bucketId });
   }
   return replitStorageClient;
 }
