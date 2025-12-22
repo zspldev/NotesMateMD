@@ -1225,6 +1225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create patient with auto-generated MRN
       const patientWithMRN: InsertPatientWithMRN = {
         patientid,
+        mrn: mrnNumber.toString(),
         ...validatedData,
       };
       
