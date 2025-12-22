@@ -1732,10 +1732,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No document file provided" });
       }
       
+      // Diagnostic logging for upload debugging
+      console.log(`Document upload received: {
+  originalname: ${req.file.originalname},
+  mimetype: ${req.file.mimetype},
+  size: ${req.file.size},
+  bufferLength: ${req.file.buffer?.length || 'NO BUFFER'},
+  hasBuffer: ${!!req.file.buffer}
+}`);
+      
+      // Validate that we actually have file content
+      if (!req.file.buffer || req.file.buffer.length === 0) {
+        console.error('UPLOAD ERROR: File buffer is empty or missing!');
+        return res.status(400).json({ error: "File upload failed - no content received" });
+      }
+      
+      // Use actual buffer length as authoritative file size
+      const actualFileSize = req.file.buffer.length;
+      
+      // Reject suspiciously small files (except text files which can be tiny)
+      const isTextFile = req.file.mimetype.startsWith('text/');
+      if (actualFileSize < 10 && !isTextFile) {
+        console.error(`UPLOAD ERROR: File too small (${actualFileSize} bytes) for type ${req.file.mimetype}`);
+        return res.status(400).json({ 
+          error: `File appears corrupted or incomplete (${actualFileSize} bytes). Please try uploading again.` 
+        });
+      }
+      
       // Generate storage key: org/{orgid}/patients/{patientid}/visits/{visitid}/documents/{uuid}_{filename}
       const documentId = crypto.randomUUID();
       const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
       const storageKey = `documents/org/${patient.orgid}/patients/${patient.patientid}/visits/${visitid}/${documentId}_${safeFilename}`;
+      
+      console.log(`Uploading to S3: key=${storageKey}, bufferSize=${actualFileSize}`);
       
       // Upload to AWS S3
       const s3 = getS3Client();
@@ -1745,9 +1774,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Key: storageKey,
         Body: req.file.buffer,
         ContentType: req.file.mimetype,
+        ContentLength: actualFileSize,
       }));
       
-      // Create database record
+      console.log(`S3 upload completed: ${storageKey}`);
+      
+      // Create database record with actual buffer length as file size
       const documentRecord = await storage.createVisitDocument({
         visitid,
         orgid: patient.orgid,
@@ -1755,12 +1787,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         original_filename: req.file.originalname,
         storage_key: storageKey,
         mime_type: req.file.mimetype,
-        file_size_bytes: req.file.size,
+        file_size_bytes: actualFileSize,
         description: req.body.description || null,
         is_deleted: false
       });
       
-      console.log(`Document uploaded: ${documentRecord.document_id} by employee ${authContext.empid}`);
+      console.log(`Document record created: id=${documentRecord.document_id}, size=${actualFileSize}, employee=${authContext.empid}`);
       
       res.status(201).json(documentRecord);
     } catch (error) {

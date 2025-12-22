@@ -73,8 +73,31 @@ export default function VisitDocuments({ visitId, readOnly = false }: VisitDocum
 
   const uploadMutation = useMutation({
     mutationFn: async ({ file, desc }: { file: File; desc: string }) => {
+      // Validate file before upload
+      console.log(`Upload starting: name=${file.name}, size=${file.size}, type=${file.type}`);
+      
+      if (file.size === 0) {
+        throw new Error('File appears to be empty. Please try selecting the file again.');
+      }
+      
+      if (file.size < 10 && !file.type.startsWith('text/')) {
+        throw new Error('File size is suspiciously small. Please verify the file is not corrupted.');
+      }
+      
+      // Read file to ensure it's fully loaded before creating FormData
+      const fileBuffer = await file.arrayBuffer();
+      console.log(`File buffer loaded: ${fileBuffer.byteLength} bytes`);
+      
+      if (fileBuffer.byteLength === 0) {
+        throw new Error('Could not read file content. Please try again.');
+      }
+      
+      // Create a Blob from the buffer and attach to FormData with filename
+      const verifiedBlob = new Blob([fileBuffer], { type: file.type });
+      console.log(`Verified blob: size=${verifiedBlob.size}, type=${verifiedBlob.type}`);
+      
       const formData = new FormData();
-      formData.append('document', file);
+      formData.append('document', verifiedBlob, file.name);
       if (desc) {
         formData.append('description', desc);
       }
@@ -93,7 +116,16 @@ export default function VisitDocuments({ visitId, readOnly = false }: VisitDocum
         throw new Error(errorData.error || 'Failed to upload document');
       }
       
-      return response.json();
+      const result = await response.json();
+      
+      // Verify the uploaded size matches what we sent
+      if (result.file_size_bytes && result.file_size_bytes !== verifiedBlob.size) {
+        console.error(`Size mismatch! Sent: ${verifiedBlob.size}, Stored: ${result.file_size_bytes}`);
+        throw new Error('Upload verification failed - file size mismatch. Please try again.');
+      }
+      
+      console.log(`Upload successful: ${result.document_id}, size=${result.file_size_bytes}`);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/visits', visitId, 'documents'] });
