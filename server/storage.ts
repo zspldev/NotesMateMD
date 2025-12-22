@@ -882,9 +882,13 @@ export class DatabaseStorage implements IStorage {
     const org = await this.getOrg(patient.orgid);
     if (!org) return null;
     
-    // Build date range for filtering - parse as UTC to avoid timezone issues
+    // Build date range for filtering
+    // Start: beginning of startDate in UTC (covers all timezones for that date)
+    // End: add 24 hours buffer to endDate to account for timezone differences
+    // This ensures notes created on endDate in any timezone (up to UTC-12) are included
     const start = new Date(startDate + 'T00:00:00.000Z');
-    const end = new Date(endDate + 'T23:59:59.999Z');
+    const endBase = new Date(endDate + 'T23:59:59.999Z');
+    const end = new Date(endBase.getTime() + 12 * 60 * 60 * 1000); // Add 12 hours for timezone buffer
     
     console.log(`getPatientNotesByDateRange: patient=${patientid}, start=${start.toISOString()}, end=${end.toISOString()}`);
     
