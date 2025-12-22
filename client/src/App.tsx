@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { User, Lock, Building2 } from "lucide-react";
+import { User, Lock, Building2, Loader2 } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Dashboard from "@/components/Dashboard";
 import AboutFooter from "@/components/AboutFooter";
@@ -176,6 +176,34 @@ function Router() {
 function App() {
   const [loginData, setLoginData] = useState<LoginResponse | null>(null);
   const [activeRole, setActiveRole] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  // Restore session from stored token on page load
+  useEffect(() => {
+    const restoreSession = async () => {
+      if (!api.hasStoredToken()) {
+        setIsRestoring(false);
+        return;
+      }
+      
+      try {
+        const userData = await api.getCurrentUser();
+        if (userData) {
+          setLoginData(userData);
+          const defaultActiveRole = userData.activeRole || 
+            (userData.employee.role === 'org_admin' ? 'org_admin' : userData.employee.role);
+          setActiveRole(defaultActiveRole || null);
+          console.log('Session restored for:', userData.employee.username);
+        }
+      } catch (error) {
+        console.error('Failed to restore session:', error);
+      } finally {
+        setIsRestoring(false);
+      }
+    };
+    
+    restoreSession();
+  }, []);
 
   const handleLogin = (data: LoginResponse) => {
     setLoginData(data);
@@ -228,6 +256,24 @@ function App() {
       console.error('Failed to switch role:', error);
     }
   };
+
+  // Show loading spinner while restoring session
+  if (isRestoring) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <ThemeProvider defaultTheme="light">
+            <div className="min-h-screen bg-background flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Restoring session...</p>
+              </div>
+            </div>
+          </ThemeProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

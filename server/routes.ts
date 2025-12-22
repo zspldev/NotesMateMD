@@ -458,6 +458,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get current authenticated user from token (for session restoration after page refresh)
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "No authorization token provided" });
+      }
+      
+      const token = authHeader.substring(7);
+      const authContext = verifyAccessToken(token);
+      
+      if (!authContext) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+      
+      // Get the employee info
+      const employee = await storage.getEmployee(authContext.empid);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+      
+      // Check if employee is still active
+      if (employee.is_active === false) {
+        return res.status(401).json({ error: "Account is deactivated" });
+      }
+      
+      // Get organization info
+      let org = null;
+      const effectiveOrgId = authContext.impersonatedOrgId || employee.orgid;
+      if (effectiveOrgId) {
+        org = await storage.getOrg(effectiveOrgId);
+      }
+      
+      const { password_hash, ...employeeData } = employee;
+      
+      res.json({
+        employee: employeeData,
+        organization: org,
+        accessToken: token, // Return same token
+        activeRole: authContext.activeRole
+      });
+    } catch (error) {
+      console.error('Auth me error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Switch role for dual-role users (e.g., org_admin with secondary_role=doctor)
   app.post("/api/auth/switch-role", async (req, res) => {
     try {

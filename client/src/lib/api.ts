@@ -198,6 +198,28 @@ class ApiClient {
     }
   }
 
+  // Get current user from stored token (for session restoration after page refresh)
+  async getCurrentUser(): Promise<LoginResponse | null> {
+    const token = this.getAccessToken();
+    if (!token) {
+      return null;
+    }
+    
+    try {
+      const response = await this.request<LoginResponse>('/auth/me');
+      return response;
+    } catch (error) {
+      // Token is invalid or expired, clear it
+      this.clearAccessToken();
+      return null;
+    }
+  }
+
+  // Check if there's a stored token
+  hasStoredToken(): boolean {
+    return !!this.getAccessToken();
+  }
+
   // Organizations (super admin only)
   async getOrganizations(): Promise<{
     orgid: string;
