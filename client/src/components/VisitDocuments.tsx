@@ -128,6 +128,11 @@ export default function VisitDocuments({ visitId, readOnly = false }: VisitDocum
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/visits', visitId, 'documents'] });
+      // Also invalidate patient visits to update document counts in history
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        return Array.isArray(key) && key[0]?.toString().includes('/api/patients') && key[0]?.toString().includes('/visits');
+      }});
       toast({
         title: 'Document uploaded',
         description: 'The document has been uploaded successfully.'
@@ -160,6 +165,11 @@ export default function VisitDocuments({ visitId, readOnly = false }: VisitDocum
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/visits', visitId, 'documents'] });
+      // Also invalidate patient visits to update document counts in history
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        return Array.isArray(key) && key[0]?.toString().includes('/api/patients') && key[0]?.toString().includes('/visits');
+      }});
       toast({
         title: 'Document deleted',
         description: 'The document has been removed.'
