@@ -1218,10 +1218,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Organization not found" });
       }
       
-      // Use org's MRN sequence (6-digit starting at 100001)
-      // Format: MRN{org_number}-{mrn} to ensure global uniqueness across orgs
-      const mrnNumber = org.mrn_sequence_current || 100001;
-      const patientid = `MRN${org.org_number}-${mrnNumber}`;
+      // Use org's MRN sequence (5-digit starting at 10001)
+      // Format: {org_number}-{mrn} for global uniqueness (no MRN prefix)
+      const mrnNumber = org.mrn_sequence_current || 10001;
+      const patientid = `${org.org_number}-${mrnNumber}`;
       
       // Create patient with auto-generated MRN
       const patientWithMRN: InsertPatientWithMRN = {
