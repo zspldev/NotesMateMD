@@ -76,10 +76,11 @@ Preferred communication style: Simple, everyday language.
 - **Organizations**: Multi-tenant support with unique `org_number` and `org_shortname`.
 - **Employees**: Roles (Doctor, Nurse, PA) and organizational association.
 - **Patients**: MRN-based identification, demographics.
-  - **MRN Format**: `MRN{org_number}-{mrn}` (e.g., "MRN1002-100001") ensures global uniqueness across orgs
-  - Each org has its own MRN sequence starting at 100001 (6-digit numbers)
+  - **MRN Format**: `{org_number}-{mrn}` (e.g., "1002-10001") - no "MRN" prefix for cleaner display
+  - Each org has its own MRN sequence starting at 10001 (5-digit numbers, max ~90,000 patients per org)
   - The `patientid` field (primary key) uses this org-prefixed format
-  - The `mrn` field stores just the number (e.g., "100001") for display
+  - The `mrn` field stores just the number (e.g., "10001") for display
+  - UI shows "MRN" as a column header/label, not embedded in the ID itself
 - **Visits**: Patient encounters with purpose tracking.
 - **Visit Notes**: Audio recordings, transcriptions, and editing capabilities.
 
