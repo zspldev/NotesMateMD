@@ -1219,8 +1219,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Use org's MRN sequence (6-digit starting at 100001)
+      // Format: MRN{org_number}-{mrn} to ensure global uniqueness across orgs
       const mrnNumber = org.mrn_sequence_current || 100001;
-      const patientid = `MRN${mrnNumber}`;
+      const patientid = `MRN${org.org_number}-${mrnNumber}`;
       
       // Create patient with auto-generated MRN
       const patientWithMRN: InsertPatientWithMRN = {
