@@ -99,6 +99,7 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const currentUser = {
     firstName: loginData.employee.first_name,
@@ -625,7 +626,7 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
                 </button>
                 <button 
                   className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={onLogout}
+                  onClick={() => setShowLogoutDialog(true)}
                   data-testid="button-logout-mobile"
                 >
                   <LogOut className="h-5 w-5" />
@@ -674,7 +675,7 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
               
               <Button 
                 variant="ghost" 
-                onClick={onLogout}
+                onClick={() => setShowLogoutDialog(true)}
                 data-testid="button-logout"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -748,6 +749,36 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
               data-testid="button-discard-changes"
             >
               Discard Changes
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to log out? Any unsaved work will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => setShowLogoutDialog(false)}
+              data-testid="button-cancel-logout"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setShowLogoutDialog(false);
+                onLogout();
+              }}
+              data-testid="button-confirm-logout"
+            >
+              Logout
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
