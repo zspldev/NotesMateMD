@@ -181,7 +181,9 @@ export default function VisitHistory({ visits, onPlayAudio, onViewNote, patientN
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = String(date.getFullYear()).slice(-2);
-    return `${day}/${month}/${year}`;
+    // Format time in local timezone
+    const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${day}/${month}/${year} at ${time}`;
   };
 
   const handlePlayPause = async (note: FlatNote) => {
