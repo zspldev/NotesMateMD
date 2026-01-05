@@ -258,6 +258,31 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
     setIsNewPatientDialogOpen(true);
   }, []);
 
+  // Reload visits for current patient (used when returning from visit note page)
+  const reloadVisits = useCallback(async () => {
+    if (!selectedPatient) return;
+    
+    try {
+      const visitsData = await api.getPatientVisits(selectedPatient.patientid);
+      const uiVisits = visitsData.map(mapVisitToUI);
+      
+      // Sort visits by most recent activity
+      uiVisits.sort((a, b) => {
+        const aLatestNote = a.notes.length > 0 ? new Date(a.notes[0].createdAt).getTime() : 0;
+        const bLatestNote = b.notes.length > 0 ? new Date(b.notes[0].createdAt).getTime() : 0;
+        const aVisitDate = new Date(a.visitDate).getTime();
+        const bVisitDate = new Date(b.visitDate).getTime();
+        const aTime = aLatestNote || aVisitDate;
+        const bTime = bLatestNote || bVisitDate;
+        return bTime - aTime;
+      });
+      
+      setVisits(uiVisits);
+    } catch (error) {
+      console.error('Failed to reload visits:', error);
+    }
+  }, [selectedPatient, mapVisitToUI]);
+
   const handleRefreshPatients = useCallback(async () => {
     if (!effectiveOrgId) return;
     try {
@@ -523,11 +548,12 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
                   </div>
                   <Button 
                     variant="outline" 
-                    onClick={() => {
+                    onClick={async () => {
                       if (hasUnsavedChanges) {
                         setShowUnsavedDialog(true);
                       } else {
                         setCurrentView('history');
+                        await reloadVisits(); // Refresh visit history to capture any document uploads
                       }
                     }}
                     data-testid="button-back-to-history"
@@ -741,10 +767,11 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
             </AlertDialogCancel>
             <Button
               variant="destructive"
-              onClick={() => {
+              onClick={async () => {
                 setShowUnsavedDialog(false);
                 setHasUnsavedChanges(false);
                 setCurrentView('history');
+                await reloadVisits(); // Refresh visit history to capture any document uploads
               }}
               data-testid="button-discard-changes"
             >
