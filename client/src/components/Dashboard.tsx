@@ -604,6 +604,18 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
                 </p>
               </div>
               <div className="flex items-center gap-2 sm:hidden">
+                {/* Role switch button for mobile - dual-role users */}
+                {isOrgAdmin && hasSecondaryRole && (
+                  <Button 
+                    variant="outline"
+                    size="icon"
+                    onClick={() => onSwitchRole?.(isInAdminView ? 'doctor' : 'org_admin')}
+                    data-testid="button-switch-role-mobile"
+                    title={isInAdminView ? 'Switch to Clinical View' : 'Switch to Admin View'}
+                  >
+                    <ArrowRightLeft className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button 
                   variant="ghost" 
                   size="icon"
