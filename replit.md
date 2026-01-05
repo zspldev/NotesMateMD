@@ -115,6 +115,64 @@ Preferred communication style: Simple, everyday language.
 - AWS S3 for file storage
 - Meets data residency requirements for India's Digital Personal Data Protection Act
 
+## Future Roadmap: ABDM Integration
+
+### Overview
+ABDM (Ayushman Bharat Digital Mission) is India's national digital health infrastructure enabling secure, consent-based health record exchange across healthcare facilities. Integrating NotesMate with ABDM would allow clinical notes to be shared with any ABDM-connected hospital or health system.
+
+### Relevant Milestones for NotesMate
+- **M1 (Patient Registration)**: Link patients with their national ABHA (14-digit health ID)
+- **M2 (Health Information Provider)**: Push clinical notes as FHIR documents to ABDM network
+
+### Technical Requirements
+| Component | Current State | ABDM Requirement |
+|-----------|---------------|------------------|
+| Patient ID | Org-prefixed MRN | Add ABHA ID field + verification |
+| Clinical Notes | SOAP, H&P, Progress, Procedure templates | Convert to FHIR document bundles |
+| Export | PDF format | Encrypted FHIR export |
+| Consent | Not applicable | Patient consent workflows required |
+| Data Standards | Free-text with templates | SNOMED CT, ICD-10, LOINC coding |
+
+### Effort Estimate
+| Phase | Duration | Description |
+|-------|----------|-------------|
+| Discovery & Setup | 2 weeks | ABDM sandbox registration, architecture, data mapping |
+| M1 Implementation | 4 weeks | ABHA integration, patient linking, consent UI |
+| M2 Implementation | 8 weeks | FHIR document pipeline, encryption, push to ABDM |
+| Hardening | 2 weeks | Terminology mapping, error handling, security |
+| QA & Certification | 2 weeks | Testing, WASA audit prep, certification demo |
+| **Total** | **~12 weeks** | 18 developer-weeks of effort |
+
+### New Components Required
+- ABDM Gateway service (sandbox → production)
+- FHIR document generator (HAPI FHIR or Medblocks toolkit)
+- ABDM encryption layer (ndhm-crypto)
+- Consent management APIs
+- Terminology server (SNOMED CT, LOINC)
+- Background job queue for async pushes
+
+### Costs
+- **WASA Security Audit**: ₹50,000 - ₹3,00,000 (CERT-IN certified agency)
+- **SNOMED CT License**: May be free for India via NRCeS
+
+### Recommendations
+1. **Start with Discovery Phase (2 weeks)**: Register on ABDM Sandbox, map current note templates to FHIR document types, prototype ABHA verification flow. This validates feasibility before full commitment.
+
+2. **Prioritize M1 First**: ABHA linking provides immediate value (patient identity verification) with lower complexity than M2.
+
+3. **Consider Third-Party ABDM Middleware**: Services like EHR.Network's ABDMc or Nirmitee.io offer pre-built APIs that reduce development time and certification complexity.
+
+4. **Plan for Terminology Normalization**: Converting free-text clinical notes to SNOMED/ICD-10 coded data is the most challenging aspect. Consider AI-assisted coding tools.
+
+5. **Chrome Extension Alternative**: Instead of full Chrome extension, consider a simpler approach - SMART-on-FHIR integration that allows NotesMate to be launched directly from partner HIMS systems.
+
+### Key Resources
+- ABDM Sandbox: https://sandbox.abdm.gov.in
+- FHIR Implementation Guide: https://nrces.in/ndhm/fhir/r4/
+- ABDM Documentation: https://abdm.gov.in/resources
+
+---
+
 ## CRITICAL: Database Configuration
 **WARNING: This app uses AWS RDS PostgreSQL, NOT Replit's internal PostgreSQL database.**
 
