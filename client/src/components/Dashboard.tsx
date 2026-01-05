@@ -603,35 +603,34 @@ export default function Dashboard({ loginData, onLogout, onSwitchOrg, onClearImp
                   Medical Audio Notes & Transcription
                 </p>
               </div>
-              <div className="flex items-center gap-2 sm:hidden">
+              <div className="flex items-center gap-3 sm:hidden">
                 {/* Role switch button for mobile - dual-role users */}
                 {isOrgAdmin && hasSecondaryRole && (
-                  <Button 
-                    variant="outline"
-                    size="icon"
+                  <button 
+                    className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
                     onClick={() => onSwitchRole?.(isInAdminView ? 'doctor' : 'org_admin')}
                     data-testid="button-switch-role-mobile"
-                    title={isInAdminView ? 'Switch to Clinical View' : 'Switch to Admin View'}
                   >
-                    <ArrowRightLeft className="h-4 w-4" />
-                  </Button>
+                    <ArrowRightLeft className="h-5 w-5" />
+                    <span className="text-[10px]">{isInAdminView ? 'Clinical' : 'Admin'}</span>
+                  </button>
                 )}
-                <Button 
-                  variant="ghost" 
-                  size="icon"
+                <button 
+                  className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
                   onClick={toggleTheme}
                   data-testid="button-theme-toggle-mobile"
                 >
-                  {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
+                  {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                  <span className="text-[10px]">{theme === "light" ? 'Dark' : 'Light'}</span>
+                </button>
+                <button 
+                  className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
                   onClick={onLogout}
                   data-testid="button-logout-mobile"
                 >
-                  <LogOut className="h-4 w-4" />
-                </Button>
+                  <LogOut className="h-5 w-5" />
+                  <span className="text-[10px]">Logout</span>
+                </button>
               </div>
             </div>
             
