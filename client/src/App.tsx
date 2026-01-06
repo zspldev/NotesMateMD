@@ -151,7 +151,6 @@ function LoginPage({ onLogin }: { onLogin: (loginData: LoginResponse) => void })
           <div className="mt-6 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground space-y-1">
             <p><strong>Demo Credentials:</strong></p>
             <p>Org: 1002, User: dr.smith, Pass: simple123</p>
-            <p>Super Admin: super.admin, Pass: simple123</p>
           </div>
           
           {/* About Footer */}
